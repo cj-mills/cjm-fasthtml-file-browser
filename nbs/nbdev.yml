@@ -1,0 +1,9 @@
+project:
+  output-dir: _docs
+
+website:
+  title: "cjm-fasthtml-file-browser"
+  site-url: "https://cj-mills.github.io/cjm-fasthtml-file-browser"
+  description: "Interactive file system navigation and selection UI components for FastHTML applications with extensible provider support."
+  repo-branch: main
+  repo-url: "https://github.com/cj-mills/cjm-fasthtml-file-browser"
