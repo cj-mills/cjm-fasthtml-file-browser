@@ -8,3 +8,1021 @@
 ``` bash
 pip install cjm_fasthtml_file_browser
 ```
+
+## Project Structure
+
+    nbs/
+    ├── components/ (5)
+    │   ├── browser.ipynb   # Main file browser component that composes all sub-components.
+    │   ├── item.ipynb      # File and folder item rendering components for the file browser.
+    │   ├── listing.ipynb   # Directory listing components for list and grid views.
+    │   ├── path_bar.ipynb  # Path display, breadcrumbs navigation, and optional path input for the file browser.
+    │   └── toolbar.ipynb   # View mode toggle, sort controls, and filter controls for the file browser.
+    ├── core/ (4)
+    │   ├── config.ipynb     # Configuration dataclasses and enums for the file browser.
+    │   ├── html_ids.ipynb   # HTML ID constants for HTMX targeting in the file browser.
+    │   ├── models.ipynb     # Core data models for the file browser including DirectoryListing, BrowserSelection, and BrowserState.
+    │   └── protocols.ipynb  # Protocol definitions for extensible file system providers.
+    ├── providers/ (1)
+    │   └── local.ipynb  # Local file system provider for interactive directory navigation.
+    └── routes/ (1)
+        └── handlers.ipynb  # Route handlers and router initialization for the file browser.
+
+Total: 11 notebooks across 5 directories
+
+## Module Dependencies
+
+``` mermaid
+graph LR
+    components_browser[components.browser<br/>Browser]
+    components_item[components.item<br/>Item]
+    components_listing[components.listing<br/>Listing]
+    components_path_bar[components.path_bar<br/>Path Bar]
+    components_toolbar[components.toolbar<br/>Toolbar]
+    core_config[core.config<br/>Config]
+    core_html_ids[core.html_ids<br/>HTML IDs]
+    core_models[core.models<br/>Models]
+    core_protocols[core.protocols<br/>Protocols]
+    providers_local[providers.local<br/>Local Provider]
+    routes_handlers[routes.handlers<br/>Handlers]
+
+    components_browser --> components_listing
+    components_browser --> core_html_ids
+    components_browser --> core_models
+    components_browser --> components_path_bar
+    components_browser --> core_config
+    components_browser --> components_toolbar
+    components_item --> core_config
+    components_listing --> core_models
+    components_listing --> core_config
+    components_listing --> components_item
+    components_path_bar --> components_item
+    components_path_bar --> core_config
+    components_toolbar --> core_models
+    components_toolbar --> components_item
+    components_toolbar --> core_config
+    core_protocols --> core_models
+    providers_local --> core_protocols
+    providers_local --> core_models
+    routes_handlers --> core_models
+    routes_handlers --> components_browser
+    routes_handlers --> core_config
+    routes_handlers --> providers_local
+    routes_handlers --> core_protocols
+```
+
+*23 cross-module dependencies detected*
+
+## CLI Reference
+
+No CLI commands found in this project.
+
+## Module Overview
+
+Detailed documentation for each module in the project:
+
+### Browser (`browser.ipynb`)
+
+> Main file browser component that composes all sub-components.
+
+#### Import
+
+``` python
+from cjm_fasthtml_file_browser.components.browser import (
+    render_file_browser,
+    render_browser_content
+)
+```
+
+#### Functions
+
+```` python
+def render_file_browser(
+    listing: DirectoryListing,              # Current directory listing
+    config: FileBrowserConfig,              # Browser configuration
+    state: BrowserState,                    # Current browser state
+    navigate_url: str,                      # URL for directory navigation
+    select_url: str,                        # URL for file selection
+    toggle_view_url: str,                   # URL for view mode toggle
+    change_sort_url: str,                   # URL for sort change
+    refresh_url: str,                       # URL for refresh
+    path_input_url: str = "",               # URL for path input (optional)
+    home_path: str = "",                    # Home directory path
+) -> Any:  # Complete file browser component
+    """
+    Render the complete file browser component.
+    
+    Component hierarchy:
+    ```
+    render_file_browser(listing, config, state, ...)
+    ├── render_path_bar(...)        [if config.show_path_bar]
+    │   ├── nav_buttons()
+    │   └── breadcrumbs() OR path_input()
+    ├── render_toolbar(...)         [if config.show_toolbar]
+    │   ├── view_mode_toggle()
+    │   └── sort_controls()
+    └── render_listing(...)
+        ├── parent_navigation()
+        └── items[]
+            └── render_item() [file or folder]
+    ```
+    """
+````
+
+``` python
+def render_browser_content(
+    listing: DirectoryListing,              # Current directory listing
+    config: FileBrowserConfig,              # Browser configuration
+    state: BrowserState,                    # Current browser state
+    navigate_url: str,                      # URL for directory navigation
+    select_url: str,                        # URL for file selection
+) -> Any:  # Browser content (listing only)
+    "Render just the browser content for partial HTMX updates."
+```
+
+### Config (`config.ipynb`)
+
+> Configuration dataclasses and enums for the file browser.
+
+#### Import
+
+``` python
+from cjm_fasthtml_file_browser.core.config import (
+    SelectionMode,
+    ViewMode,
+    FileColumn,
+    ViewConfig,
+    FilterConfig,
+    FileBrowserCallbacks,
+    FileBrowserConfig
+)
+```
+
+#### Classes
+
+``` python
+class SelectionMode(str, Enum):
+    "File selection modes."
+```
+
+``` python
+class ViewMode(str, Enum):
+    "Display modes for directory listing."
+```
+
+``` python
+class FileColumn(str, Enum):
+    "Available columns for list view."
+```
+
+``` python
+@dataclass
+class ViewConfig:
+    "View display configuration."
+    
+    default_mode: ViewMode = ViewMode.LIST  # Default view mode
+    allow_mode_toggle: bool = True  # Allow user to toggle view mode
+    columns: List[FileColumn] = field(...)
+    grid_columns: int = 4  # Number of columns in grid
+    show_thumbnails: bool = False  # Show image thumbnails in grid
+    default_sort: FileColumn = FileColumn.NAME  # Default sort column
+    sort_folders_first: bool = True  # Sort folders before files
+    allow_sort_toggle: bool = True  # Allow user to change sort
+```
+
+``` python
+@dataclass
+class FilterConfig:
+    "Filtering configuration."
+    
+    allowed_extensions: Optional[List[str]]  # Include only these extensions (None = all)
+    show_directories: bool = True  # Show directories
+    show_hidden: bool = False  # Show hidden files/directories
+    show_system_files: bool = False  # Show system files
+    custom_filter: Optional[Callable[[FileInfo], bool]]  # Custom filter function
+    
+    def matches(
+            self,
+            file_info: FileInfo  # File to check against filter
+        ) -> bool:  # True if file passes filter
+        "Check if a file matches the filter criteria."
+```
+
+``` python
+@dataclass
+class FileBrowserCallbacks:
+    "Event callbacks for customization."
+    
+    on_navigate: Optional[Callable[[str], None]]  # Called when directory changes
+    on_select: Optional[Callable[[str], None]]  # Called when file selected
+    on_selection_change: Optional[Callable[[List[str]], None]]  # Called when selection changes
+    on_open: Optional[Callable[[str], None]]  # Called on file double-click/enter
+    validate_selection: Optional[Callable[[str], Tuple[bool, str]]]  # Validate before select
+    validate_navigation: Optional[Callable[[str], Tuple[bool, str]]]  # Validate before navigate
+```
+
+``` python
+@dataclass
+class FileBrowserConfig:
+    "Main configuration for file browser."
+    
+    provider: Optional[Any]  # FileSystemProvider, defaults to local
+    start_path: Optional[str]  # Initial path (defaults to home)
+    selection_mode: SelectionMode = SelectionMode.SINGLE
+    selectable_types: Literal['files', 'directories', 'both'] = 'files'
+    max_selections: Optional[int]  # For MULTIPLE mode
+    view: ViewConfig = field(...)
+    filter: FilterConfig = field(...)
+    show_path_bar: bool = True
+    show_path_input: bool = False  # Direct path entry field
+    show_breadcrumbs: bool = True
+    show_parent_navigation: bool = True
+    show_toolbar: bool = True  # Show view/sort controls
+    bookmarks: Optional[List[Tuple[str, str]]]  # [(label, path), ...]
+    show_bookmarks: bool = False
+    container_id: str = 'file-browser'
+    content_id: str = 'file-browser-content'
+    path_bar_id: str = 'file-browser-path'
+    listing_id: str = 'file-browser-listing'
+    keyboard_config: Optional[Any]
+    
+    def can_select(
+            self,
+            file_info: FileInfo  # File to check
+        ) -> bool:  # True if file can be selected
+        "Check if a file/directory can be selected based on config."
+```
+
+### Handlers (`handlers.ipynb`)
+
+> Route handlers and router initialization for the file browser.
+
+#### Import
+
+``` python
+from cjm_fasthtml_file_browser.routes.handlers import (
+    init_router
+)
+```
+
+#### Functions
+
+``` python
+def _handle_navigate(
+    provider: FileSystemProvider,           # File system provider
+    state_getter: Callable[[], BrowserState],  # Function to get current state
+    state_setter: Callable[[BrowserState], None],  # Function to save state
+    callbacks: Optional[FileBrowserCallbacks],  # Optional callbacks
+    path: str,                              # Path to navigate to
+    render_fn: Callable[[BrowserState], Any],  # Function to render browser
+) -> Any:  # Rendered browser component
+    "Handle navigation to a new directory."
+```
+
+``` python
+def _handle_path_input(
+    provider: FileSystemProvider,           # File system provider
+    state_getter: Callable[[], BrowserState],  # Function to get current state
+    state_setter: Callable[[BrowserState], None],  # Function to save state
+    callbacks: Optional[FileBrowserCallbacks],  # Optional callbacks
+    path: str,                              # Path input by user
+    render_fn: Callable[[BrowserState], Any],  # Function to render browser
+    navigate_fn: Callable[[str], Any],      # Function to handle navigation
+) -> Any:  # Rendered browser component
+    "Handle direct path input."
+```
+
+``` python
+def _handle_select(
+    config: FileBrowserConfig,              # Browser configuration
+    state_getter: Callable[[], BrowserState],  # Function to get current state
+    state_setter: Callable[[BrowserState], None],  # Function to save state
+    callbacks: Optional[FileBrowserCallbacks],  # Optional callbacks
+    path: str,                              # Path to select/deselect
+    render_fn: Callable[[BrowserState], Any],  # Function to render browser
+) -> Any:  # Rendered browser component
+    "Handle file selection."
+```
+
+``` python
+def _handle_toggle_view(
+    state_getter: Callable[[], BrowserState],  # Function to get current state
+    state_setter: Callable[[BrowserState], None],  # Function to save state
+    view_mode: str,                         # New view mode ("list" or "grid")
+    render_fn: Callable[[BrowserState], Any],  # Function to render browser
+) -> Any:  # Rendered browser component
+    "Handle view mode toggle."
+```
+
+``` python
+def _handle_change_sort(
+    state_getter: Callable[[], BrowserState],  # Function to get current state
+    state_setter: Callable[[BrowserState], None],  # Function to save state
+    sort_by: str,                           # Column to sort by
+    sort_descending: str,                   # Whether to sort descending ("true"/"false")
+    render_fn: Callable[[BrowserState], Any],  # Function to render browser
+) -> Any:  # Rendered browser component
+    "Handle sort change."
+```
+
+``` python
+def _handle_refresh(
+    state_getter: Callable[[], BrowserState],  # Function to get current state
+    render_fn: Callable[[BrowserState], Any],  # Function to render browser
+) -> Any:  # Rendered browser component
+    "Handle refresh (re-render with current state)."
+```
+
+```` python
+def init_router(
+    config: FileBrowserConfig,                              # Browser configuration
+    provider: FileSystemProvider,                           # File system provider
+    state_getter: Callable[[], BrowserState],               # Function to get current state
+    state_setter: Callable[[BrowserState], None],           # Function to save state
+    route_prefix: str = "/browser",                         # Route prefix for all browser routes
+    callbacks: Optional[FileBrowserCallbacks] = None,       # Optional callbacks
+    home_path: Optional[str] = None,                        # Home directory (defaults to provider)
+) -> APIRouter:  # Configured APIRouter with all file browser routes
+    """
+    Initialize and return an APIRouter with all file browser routes.
+    
+    Route paths are automatically derived from function names:
+    - navigate -> {prefix}/navigate
+    - select -> {prefix}/select
+    - toggle_view -> {prefix}/toggle_view
+    - change_sort -> {prefix}/change_sort
+    - refresh -> {prefix}/refresh
+    - path_input -> {prefix}/path_input
+    
+    Example:
+    ```python
+    from cjm_fasthtml_app_core.core.routing import register_routes
+    
+    router = init_router(
+        config=config,
+        provider=provider,
+        state_getter=get_state,
+        state_setter=set_state,
+        route_prefix="/browser",
+    )
+    register_routes(app, router)
+    ```
+    """
+````
+
+### HTML IDs (`html_ids.ipynb`)
+
+> HTML ID constants for HTMX targeting in the file browser.
+
+#### Import
+
+``` python
+from cjm_fasthtml_file_browser.core.html_ids import (
+    FileBrowserHtmlIds
+)
+```
+
+#### Classes
+
+``` python
+class FileBrowserHtmlIds:
+    "Default HTML IDs for file browser components."
+    
+    def item_id(
+            cls,
+            index: int  # Item index in the listing
+        ) -> str:  # HTML ID for the item
+        "Generate item ID for a specific index."
+    
+    def as_selector(
+            cls,
+            html_id: str  # HTML ID
+        ) -> str:  # CSS selector for the ID
+        "Convert HTML ID to CSS selector."
+```
+
+### Item (`item.ipynb`)
+
+> File and folder item rendering components for the file browser.
+
+#### Import
+
+``` python
+from cjm_fasthtml_file_browser.components.item import (
+    FILE_TYPE_ICONS,
+    BROWSER_ICONS,
+    render_list_item,
+    render_grid_item,
+    render_parent_item,
+    render_item
+)
+```
+
+#### Functions
+
+``` python
+def _get_file_icon(
+    file_info: FileInfo,  # File to get icon for
+    size: int = 4         # Icon size (Tailwind scale)
+) -> Any:  # Lucide icon component
+    "Get the appropriate icon for a file based on its type."
+```
+
+``` python
+def render_list_item(
+    file_info: FileInfo,                      # File to render
+    config: FileBrowserConfig,                # Browser configuration
+    is_selected: bool = False,                # Whether item is selected
+    item_id: Optional[str] = None,            # HTML ID for the item
+    navigate_url: Optional[str] = None,       # URL for directory navigation
+    select_url: Optional[str] = None,         # URL for file selection
+    hx_target: Optional[str] = None,          # HTMX target for swaps
+) -> Any:  # Table row component
+    "Render a file/folder as a list view row."
+```
+
+``` python
+def render_grid_item(
+    file_info: FileInfo,                      # File to render
+    config: FileBrowserConfig,                # Browser configuration
+    is_selected: bool = False,                # Whether item is selected
+    item_id: Optional[str] = None,            # HTML ID for the item
+    navigate_url: Optional[str] = None,       # URL for directory navigation
+    select_url: Optional[str] = None,         # URL for file selection
+    hx_target: Optional[str] = None,          # HTMX target for swaps
+) -> Any:  # Grid card component
+    "Render a file/folder as a grid view card."
+```
+
+``` python
+def render_parent_item(
+    parent_path: str,                         # Parent directory path
+    view_mode: ViewMode,                      # Current view mode
+    navigate_url: str,                        # URL for navigation
+    hx_target: Optional[str] = None,          # HTMX target
+) -> Any:  # Parent navigation component
+    "Render the parent directory navigation item."
+```
+
+``` python
+def render_item(
+    file_info: FileInfo,                      # File to render
+    config: FileBrowserConfig,                # Browser configuration
+    view_mode: ViewMode,                      # Current view mode
+    is_selected: bool = False,                # Whether item is selected
+    item_id: Optional[str] = None,            # HTML ID for the item
+    navigate_url: Optional[str] = None,       # URL for directory navigation
+    select_url: Optional[str] = None,         # URL for file selection
+    hx_target: Optional[str] = None,          # HTMX target for swaps
+) -> Any:  # Item component (row or card)
+    "Render a file/folder item based on view mode."
+```
+
+#### Variables
+
+``` python
+FILE_TYPE_ICONS: Dict[FileType, str]
+BROWSER_ICONS: Dict[str, str]
+```
+
+### Listing (`listing.ipynb`)
+
+> Directory listing components for list and grid views.
+
+#### Import
+
+``` python
+from cjm_fasthtml_file_browser.components.listing import (
+    sort_files,
+    filter_files,
+    render_empty_state,
+    render_error_state,
+    render_list_view,
+    render_grid_view,
+    render_listing
+)
+```
+
+#### Functions
+
+``` python
+def sort_files(
+    files: List[FileInfo],           # Files to sort
+    sort_by: str = "name",           # Sort field
+    descending: bool = False,        # Sort direction
+    folders_first: bool = True       # Sort folders before files
+) -> List[FileInfo]:  # Sorted file list
+    "Sort files by the specified field."
+```
+
+``` python
+def filter_files(
+    files: List[FileInfo],           # Files to filter
+    filter_config: FilterConfig      # Filter configuration
+) -> List[FileInfo]:  # Filtered file list
+    "Filter files based on configuration."
+```
+
+``` python
+def render_empty_state(
+    message: str = "No files found",  # Message to display
+    icon_name: str = "folder-open"    # Icon to show
+) -> Any:  # Empty state component
+    "Render empty state for when directory has no items."
+```
+
+``` python
+def render_error_state(
+    error_message: str  # Error message to display
+) -> Any:  # Error state component
+    "Render error state for when directory access fails."
+```
+
+``` python
+def _render_list_header(
+    config: FileBrowserConfig,             # Browser configuration
+    has_selectable_files: bool = False     # Whether any files can be selected
+) -> Any:  # Table header component
+    "Render the header row for list view."
+```
+
+``` python
+def render_list_view(
+    listing: DirectoryListing,              # Directory listing to render
+    config: FileBrowserConfig,              # Browser configuration
+    state: BrowserState,                    # Current browser state
+    navigate_url: Optional[str] = None,     # URL for directory navigation
+    select_url: Optional[str] = None,       # URL for file selection
+    hx_target: Optional[str] = None,        # HTMX target for swaps
+    listing_id: Optional[str] = None,       # HTML ID for the listing container
+) -> Any:  # List view component
+    "Render directory contents as a table/list view."
+```
+
+``` python
+def render_grid_view(
+    listing: DirectoryListing,              # Directory listing to render
+    config: FileBrowserConfig,              # Browser configuration
+    state: BrowserState,                    # Current browser state
+    navigate_url: Optional[str] = None,     # URL for directory navigation
+    select_url: Optional[str] = None,       # URL for file selection
+    hx_target: Optional[str] = None,        # HTMX target for swaps
+    listing_id: Optional[str] = None,       # HTML ID for the listing container
+) -> Any:  # Grid view component
+    "Render directory contents as a grid of cards."
+```
+
+``` python
+def render_listing(
+    listing: DirectoryListing,              # Directory listing to render
+    config: FileBrowserConfig,              # Browser configuration
+    state: BrowserState,                    # Current browser state
+    navigate_url: Optional[str] = None,     # URL for directory navigation
+    select_url: Optional[str] = None,       # URL for file selection
+    hx_target: Optional[str] = None,        # HTMX target for swaps
+    listing_id: Optional[str] = None,       # HTML ID for the listing container
+) -> Any:  # Listing component (table or grid)
+    "Render directory listing based on current view mode."
+```
+
+### Local Provider (`local.ipynb`)
+
+> Local file system provider for interactive directory navigation.
+
+#### Import
+
+``` python
+from cjm_fasthtml_file_browser.providers.local import (
+    LocalFileSystemProvider
+)
+```
+
+#### Classes
+
+``` python
+class LocalFileSystemProvider:
+    def __init__(
+        self,
+        extension_mapping: Optional[ExtensionMapping] = None  # For file type detection
+    )
+    "Local file system provider for interactive navigation."
+    
+    def __init__(
+            self,
+            extension_mapping: Optional[ExtensionMapping] = None  # For file type detection
+        )
+        "Initialize with optional extension mapping."
+    
+    def name(self) -> str:  # Provider identifier
+            """Provider identifier."""
+            return "local"
+    
+        @property
+        def root_path(self) -> str:  # Root path (filesystem root)
+        "Provider identifier."
+    
+    def root_path(self) -> str:  # Root path (filesystem root)
+            """Root path for this provider."""
+            return "/"
+    
+        @property
+        def path_separator(self) -> str:  # Path separator
+        "Root path for this provider."
+    
+    def path_separator(self) -> str:  # Path separator
+            """Path separator character."""
+            return os.sep
+        
+        def _get_file_info(
+            self,
+            path: Path  # Path object
+        ) -> Optional[FileInfo]:  # FileInfo or None on error
+        "Path separator character."
+    
+    def list_directory(
+            self,
+            path: str  # Directory path to list
+        ) -> DirectoryListing:  # Directory contents
+        "List contents of a directory."
+    
+    async def list_directory_async(
+            self,
+            path: str  # Directory path to list
+        ) -> DirectoryListing:  # Directory contents
+        "Async list contents of a directory."
+    
+    def get_file_info(
+            self,
+            path: str  # Path to file/directory
+        ) -> Optional[FileInfo]:  # FileInfo or None if not found
+        "Get metadata for a single file/directory."
+    
+    def get_parent_path(
+            self,
+            path: str  # Current path
+        ) -> Optional[str]:  # Parent path, or None if at root
+        "Get parent directory path."
+    
+    def join_path(
+            self,
+            base: str,   # Base path
+            *parts: str  # Path parts to join
+        ) -> str:  # Joined path
+        "Join path components."
+    
+    def normalize_path(
+            self,
+            path: str  # Path to normalize
+        ) -> str:  # Normalized/resolved path
+        "Normalize/resolve a path."
+    
+    def is_valid_path(
+            self,
+            path: str  # Path to validate
+        ) -> Tuple[bool, Optional[str]]:  # (valid, error_message)
+        "Validate path."
+    
+    def path_exists(
+            self,
+            path: str  # Path to check
+        ) -> bool:  # True if path exists
+        "Check if path exists."
+    
+    def is_directory(
+            self,
+            path: str  # Path to check
+        ) -> bool:  # True if path is a directory
+        "Check if path is a directory."
+    
+    def get_home_path(self) -> str:  # User's home directory
+        "Get the user's home directory."
+```
+
+### Models (`models.ipynb`)
+
+> Core data models for the file browser including DirectoryListing,
+> BrowserSelection, and BrowserState.
+
+#### Import
+
+``` python
+from cjm_fasthtml_file_browser.core.models import (
+    DirectoryListing,
+    BrowserSelection,
+    BrowserState
+)
+```
+
+#### Classes
+
+``` python
+@dataclass
+class DirectoryListing:
+    "Result of listing a directory."
+    
+    path: str  # Current directory path
+    items: List[FileInfo]  # Directory contents
+    parent_path: Optional[str]  # Parent directory (None if at root)
+    provider_name: str = 'local'  # Source provider
+    total_items: int = 0  # Total count (for pagination)
+    error: Optional[str]  # Error message if listing failed
+    
+```
+
+``` python
+@dataclass
+class BrowserSelection:
+    "Current selection state."
+    
+    selected_paths: List[str] = field(...)  # Selected file paths
+    last_selected: Optional[str]  # Most recently selected (for shift-click)
+    
+    def add(
+            self,
+            path: str  # Path to add to selection
+        ) -> None:  # Modifies selection in place
+        "Add a path to the selection."
+    
+    def remove(
+            self,
+            path: str  # Path to remove from selection
+        ) -> None:  # Modifies selection in place
+        "Remove a path from the selection."
+    
+    def clear(self) -> None:  # Modifies selection in place
+            """Clear all selections."""
+            self.selected_paths.clear()
+            self.last_selected = None
+    
+        def toggle(
+            self,
+            path: str  # Path to toggle
+        ) -> None:  # Modifies selection in place
+        "Clear all selections."
+    
+    def toggle(
+            self,
+            path: str  # Path to toggle
+        ) -> None:  # Modifies selection in place
+        "Toggle selection of a path."
+    
+    def is_selected(
+            self,
+            path: str  # Path to check
+        ) -> bool:  # True if path is selected
+        "Check if a path is selected."
+    
+    def set_single(
+            self,
+            path: str  # Path to set as single selection
+        ) -> None:  # Modifies selection in place
+        "Set a single path as the only selection (for single-select mode)."
+```
+
+``` python
+@dataclass
+class BrowserState:
+    "Complete browser state for persistence/restore."
+    
+    current_path: str  # Current directory path
+    selection: BrowserSelection = field(...)  # Selection state
+    view_mode: str = 'list'  # "list" or "grid"
+    sort_by: str = 'name'  # Sort field
+    sort_descending: bool = False  # Sort direction
+    filter_extensions: Optional[List[str]]  # Active extension filter
+    
+    def to_dict(self) -> Dict[str, Any]:  # Serializable dictionary
+            """Convert state to a serializable dictionary."""
+            return {
+                "current_path": self.current_path,
+        "Convert state to a serializable dictionary."
+    
+    def from_dict(
+            cls,
+            data: Dict[str, Any]  # Dictionary with state data
+        ) -> "BrowserState":  # Restored BrowserState instance
+        "Create a BrowserState from a dictionary."
+```
+
+### Path Bar (`path_bar.ipynb`)
+
+> Path display, breadcrumbs navigation, and optional path input for the
+> file browser.
+
+#### Import
+
+``` python
+from cjm_fasthtml_file_browser.components.path_bar import (
+    parse_path_segments,
+    render_breadcrumbs,
+    render_path_input,
+    render_nav_buttons,
+    render_path_bar
+)
+```
+
+#### Functions
+
+``` python
+def parse_path_segments(
+    path: str,                    # Full path to parse
+    separator: str = "/"          # Path separator
+) -> List[Tuple[str, str]]:  # List of (name, full_path) tuples
+    "Parse a path into breadcrumb segments."
+```
+
+``` python
+def render_breadcrumbs(
+    current_path: str,                      # Current directory path
+    navigate_url: str,                      # URL for navigation
+    hx_target: Optional[str] = None,        # HTMX target for swaps
+    max_segments: int = 5,                  # Max segments to show (0 = all)
+    breadcrumbs_id: Optional[str] = None,   # HTML ID for breadcrumbs
+) -> Any:  # Breadcrumbs component
+    "Render path as breadcrumb navigation."
+```
+
+``` python
+def render_path_input(
+    current_path: str,                      # Current path to display
+    navigate_url: str,                      # URL for navigation
+    hx_target: Optional[str] = None,        # HTMX target for swaps
+    input_id: Optional[str] = None,         # HTML ID for input
+) -> Any:  # Path input component
+    "Render a text input for direct path entry."
+```
+
+``` python
+def render_nav_buttons(
+    parent_path: Optional[str],             # Parent directory path (None if at root)
+    home_path: str,                         # Home directory path
+    navigate_url: str,                      # URL for navigation
+    refresh_url: Optional[str] = None,      # URL for refresh (if different)
+    hx_target: Optional[str] = None,        # HTMX target for swaps
+) -> Any:  # Navigation buttons component
+    "Render quick navigation buttons."
+```
+
+``` python
+def render_path_bar(
+    current_path: str,                      # Current directory path
+    parent_path: Optional[str],             # Parent directory path
+    home_path: str,                         # Home directory path
+    config: FileBrowserConfig,              # Browser configuration
+    navigate_url: str,                      # URL for navigation
+    refresh_url: Optional[str] = None,      # URL for refresh
+    hx_target: Optional[str] = None,        # HTMX target for swaps
+    path_bar_id: Optional[str] = None,      # HTML ID for path bar
+) -> Any:  # Path bar component
+    "Render the complete path bar."
+```
+
+### Protocols (`protocols.ipynb`)
+
+> Protocol definitions for extensible file system providers.
+
+#### Import
+
+``` python
+from cjm_fasthtml_file_browser.core.protocols import (
+    FileSystemProvider
+)
+```
+
+#### Classes
+
+``` python
+@runtime_checkable
+class FileSystemProvider(Protocol):
+    "Protocol for file system access backends."
+    
+    def name(self) -> str:  # Provider identifier (e.g., 'local', 's3', 'gdrive')
+            """Provider identifier."""
+            ...
+    
+        @property
+        def root_path(self) -> str:  # Root path for this provider
+        "Provider identifier."
+    
+    def root_path(self) -> str:  # Root path for this provider
+            """Root path for this provider."""
+            ...
+    
+        @property
+        def path_separator(self) -> str:  # Path separator character
+        "Root path for this provider."
+    
+    def path_separator(self) -> str:  # Path separator character
+            """Path separator character."""
+            ...
+    
+        def list_directory(
+            self,
+            path: str  # Directory path to list
+        ) -> DirectoryListing:  # Directory contents and metadata
+        "Path separator character."
+    
+    def list_directory(
+            self,
+            path: str  # Directory path to list
+        ) -> DirectoryListing:  # Directory contents and metadata
+        "List contents of a directory."
+    
+    async def list_directory_async(
+            self,
+            path: str  # Directory path to list
+        ) -> DirectoryListing:  # Directory contents and metadata
+        "Async list contents of a directory."
+    
+    def get_file_info(
+            self,
+            path: str  # Path to file/directory
+        ) -> Optional[FileInfo]:  # FileInfo or None if not found
+        "Get metadata for a single file/directory."
+    
+    def get_parent_path(
+            self,
+            path: str  # Current path
+        ) -> Optional[str]:  # Parent path, or None if at root
+        "Get parent directory path."
+    
+    def join_path(
+            self,
+            base: str,   # Base path
+            *parts: str  # Path parts to join
+        ) -> str:  # Joined path
+        "Join path components."
+    
+    def normalize_path(
+            self,
+            path: str  # Path to normalize
+        ) -> str:  # Normalized/resolved path
+        "Normalize/resolve a path."
+    
+    def is_valid_path(
+            self,
+            path: str  # Path to validate
+        ) -> Tuple[bool, Optional[str]]:  # (valid, error_message)
+        "Validate path, return (valid, error_message)."
+    
+    def path_exists(
+            self,
+            path: str  # Path to check
+        ) -> bool:  # True if path exists
+        "Check if path exists."
+    
+    def is_directory(
+            self,
+            path: str  # Path to check
+        ) -> bool:  # True if path is a directory
+        "Check if path is a directory."
+```
+
+### Toolbar (`toolbar.ipynb`)
+
+> View mode toggle, sort controls, and filter controls for the file
+> browser.
+
+#### Import
+
+``` python
+from cjm_fasthtml_file_browser.components.toolbar import (
+    render_view_toggle,
+    render_sort_controls,
+    render_toolbar
+)
+```
+
+#### Functions
+
+``` python
+def render_view_toggle(
+    current_mode: ViewMode,                 # Current view mode
+    toggle_url: str,                        # URL for toggling view mode
+    hx_target: Optional[str] = None,        # HTMX target for swaps
+) -> Any:  # View toggle component
+    "Render view mode toggle buttons (list/grid)."
+```
+
+``` python
+def render_sort_controls(
+    current_sort: str,                      # Current sort field
+    descending: bool,                       # Current sort direction
+    config: FileBrowserConfig,              # Browser configuration
+    sort_url: str,                          # URL for changing sort
+    hx_target: Optional[str] = None,        # HTMX target for swaps
+) -> Any:  # Sort controls component
+    "Render sort dropdown and direction toggle."
+```
+
+``` python
+def render_toolbar(
+    state: BrowserState,                    # Current browser state
+    config: FileBrowserConfig,              # Browser configuration
+    toggle_url: str,                        # URL for view toggle
+    sort_url: str,                          # URL for sort changes
+    hx_target: Optional[str] = None,        # HTMX target for swaps
+    toolbar_id: Optional[str] = None,       # HTML ID for toolbar
+) -> Any:  # Toolbar component
+    "Render the complete toolbar."
+```
