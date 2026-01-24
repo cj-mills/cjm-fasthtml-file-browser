@@ -47,28 +47,28 @@ graph LR
     routes_handlers[routes.handlers<br/>Handlers]
 
     components_browser --> components_listing
-    components_browser --> core_html_ids
-    components_browser --> core_models
-    components_browser --> components_path_bar
     components_browser --> core_config
+    components_browser --> core_html_ids
+    components_browser --> components_path_bar
+    components_browser --> core_models
     components_browser --> components_toolbar
     components_item --> core_config
-    components_listing --> core_models
-    components_listing --> core_config
     components_listing --> components_item
+    components_listing --> core_config
+    components_listing --> core_models
     components_path_bar --> components_item
     components_path_bar --> core_config
-    components_toolbar --> core_models
     components_toolbar --> components_item
     components_toolbar --> core_config
+    components_toolbar --> core_models
     core_protocols --> core_models
     providers_local --> core_protocols
     providers_local --> core_models
-    routes_handlers --> core_models
-    routes_handlers --> components_browser
     routes_handlers --> core_config
-    routes_handlers --> providers_local
+    routes_handlers --> components_browser
+    routes_handlers --> core_models
     routes_handlers --> core_protocols
+    routes_handlers --> providers_local
 ```
 
 *23 cross-module dependencies detected*
@@ -108,6 +108,7 @@ def render_file_browser(
     refresh_url: str,                       # URL for refresh
     path_input_url: str = "",               # URL for path input (optional)
     home_path: str = "",                    # Home directory path
+    hx_target: Optional[str] = None,        # Override HTMX target (default: container_id)
 ) -> Any:  # Complete file browser component
     """
     Render the complete file browser component.
@@ -136,6 +137,7 @@ def render_browser_content(
     state: BrowserState,                    # Current browser state
     navigate_url: str,                      # URL for directory navigation
     select_url: str,                        # URL for file selection
+    hx_target: Optional[str] = None,        # Override HTMX target (default: container_id)
 ) -> Any:  # Browser content (listing only)
     "Render just the browser content for partial HTMX updates."
 ```

@@ -41,6 +41,7 @@ def render_file_browser(
     refresh_url: str,                       # URL for refresh
     path_input_url: str = "",               # URL for path input (optional)
     home_path: str = "",                    # Home directory path
+    hx_target: Optional[str] = None,        # Override HTMX target (default: container_id)
 ) -> Any:  # Complete file browser component
     """
     Render the complete file browser component.
@@ -61,7 +62,8 @@ def render_file_browser(
     ```
     """
     ids = FileBrowserHtmlIds()
-    hx_target = FileBrowserHtmlIds.as_selector(config.container_id)
+    # Use provided hx_target or default to container_id
+    target = hx_target or FileBrowserHtmlIds.as_selector(config.container_id)
     
     children = []
     
@@ -74,7 +76,7 @@ def render_file_browser(
             config=config,
             navigate_url=navigate_url,
             refresh_url=refresh_url,
-            hx_target=hx_target,
+            hx_target=target,
             path_bar_id=ids.PATH_BAR,
         ))
     
@@ -85,7 +87,7 @@ def render_file_browser(
             config=config,
             toggle_url=toggle_view_url,
             sort_url=change_sort_url,
-            hx_target=hx_target,
+            hx_target=target,
             toolbar_id=ids.TOOLBAR,
         ))
     
@@ -96,7 +98,7 @@ def render_file_browser(
         state=state,
         navigate_url=navigate_url,
         select_url=select_url,
-        hx_target=hx_target,
+        hx_target=target,
         listing_id=ids.LISTING,
     )
     
@@ -127,10 +129,11 @@ def render_browser_content(
     state: BrowserState,                    # Current browser state
     navigate_url: str,                      # URL for directory navigation
     select_url: str,                        # URL for file selection
+    hx_target: Optional[str] = None,        # Override HTMX target (default: container_id)
 ) -> Any:  # Browser content (listing only)
     """Render just the browser content for partial HTMX updates."""
     ids = FileBrowserHtmlIds()
-    hx_target = FileBrowserHtmlIds.as_selector(config.container_id)
+    target = hx_target or FileBrowserHtmlIds.as_selector(config.container_id)
     
     return render_listing(
         listing=listing,
@@ -138,6 +141,6 @@ def render_browser_content(
         state=state,
         navigate_url=navigate_url,
         select_url=select_url,
-        hx_target=hx_target,
+        hx_target=target,
         listing_id=ids.LISTING,
     )
