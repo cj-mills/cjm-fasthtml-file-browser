@@ -131,13 +131,23 @@ def render_list_item(
     
     # Selection checkbox (if selection enabled)
     if config.selection_mode.value != "none" and can_select:
+        # Build checkbox attributes for HTMX selection
+        checkbox_attrs = {
+            "type": "checkbox",
+            "checked": is_selected,
+            "cls": combine_classes(checkbox, checkbox_colors.primary, checkbox_sizes.sm),
+            "onclick": "event.stopPropagation()",  # Don't trigger row click
+        }
+        # Add HTMX attributes to make checkbox directly clickable
+        if select_url:
+            checkbox_attrs["hx_post"] = select_url
+            checkbox_attrs["hx_vals"] = f'{{"path": "{file_info.path}"}}'
+            if hx_target:
+                checkbox_attrs["hx_target"] = hx_target
+            checkbox_attrs["hx_swap"] = "outerHTML"
+        
         cells.append(Td(
-            Input(
-                type="checkbox",
-                checked=is_selected,
-                cls=combine_classes(checkbox, checkbox_colors.primary, checkbox_sizes.sm),
-                onclick="event.stopPropagation()",  # Don't trigger row click
-            ),
+            Input(**checkbox_attrs),
             cls=str(w(8))
         ))
     
@@ -222,14 +232,28 @@ def render_grid_item(
     # Selection indicator
     selection_indicator = None
     if config.selection_mode.value != "none" and can_select:
-        selection_indicator = Div(
-            lucide_icon("check", size=3, cls=str(text_dui.primary_content)) if is_selected else None,
-            cls=combine_classes(
+        # Build indicator attributes
+        indicator_attrs = {
+            "cls": combine_classes(
                 w(5), h(5), rounded.full,
                 bg_dui.primary if is_selected else bg_dui.base_300,
                 flex_display, items.center, justify.center,
-                "absolute top-2 right-2"
-            )
+                "absolute top-2 right-2",
+                cursor.pointer
+            ),
+            "onclick": "event.stopPropagation()",  # Don't trigger card click
+        }
+        # Add HTMX attributes to make indicator directly clickable
+        if select_url:
+            indicator_attrs["hx_post"] = select_url
+            indicator_attrs["hx_vals"] = f'{{"path": "{file_info.path}"}}'
+            if hx_target:
+                indicator_attrs["hx_target"] = hx_target
+            indicator_attrs["hx_swap"] = "outerHTML"
+        
+        selection_indicator = Div(
+            lucide_icon("check", size=3, cls=str(text_dui.primary_content)) if is_selected else None,
+            **indicator_attrs
         )
     
     return Div(
