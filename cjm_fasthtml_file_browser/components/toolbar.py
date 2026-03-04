@@ -8,7 +8,7 @@ __all__ = ['render_view_toggle', 'render_sort_controls', 'render_toolbar']
 # %% ../../nbs/components/toolbar.ipynb #c3d4e5f6
 from typing import Any, Optional
 
-from fasthtml.common import Div, Span, Button, Select, Option, Label
+from fasthtml.common import Div, Span, Button, Select, Option, Label, Input
 
 # DaisyUI components
 from cjm_fasthtml_daisyui.components.actions.button import btn, btn_colors, btn_sizes, btn_styles
@@ -130,9 +130,10 @@ def render_sort_controls(
     )
     
     # Hidden input for current direction (for select hx_include)
-    hidden_dir = Div(
-        f'<input type="hidden" name="sort_descending" value="{str(descending).lower()}" />',
-        style="display:none"
+    hidden_dir = Input(
+        type="hidden",
+        name="sort_descending",
+        value=str(descending).lower(),
     )
     
     return Div(

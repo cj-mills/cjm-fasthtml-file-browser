@@ -15,7 +15,7 @@ from cjm_fasthtml_file_browser.core.config import (
 )
 from ..core.models import BrowserState
 from ..core.protocols import FileSystemProvider
-from ..components.browser import render_file_browser
+from ..components.browser import render_file_browser, render_browser_content
 
 # %% ../../nbs/routes/handlers.ipynb #e5f6a7b8
 def _handle_navigate(
@@ -186,7 +186,7 @@ def init_router(
     home = home_path or (provider.get_home_path() if hasattr(provider, 'get_home_path') else "/")
     
     def _render_browser(state: BrowserState) -> Any:
-        """Helper to render browser with current state."""
+        """Render full browser (for navigate, toolbar, refresh)."""
         listing = provider.list_directory(state.current_path)
         return render_file_browser(
             listing=listing,
@@ -199,6 +199,17 @@ def init_router(
             refresh_url=refresh.to(),
             path_input_url=path_input.to(),
             home_path=home,
+        )
+    
+    def _render_content(state: BrowserState) -> Any:
+        """Render listing only (for select — preserves scroll container)."""
+        listing = provider.list_directory(state.current_path)
+        return render_browser_content(
+            listing=listing,
+            config=config,
+            state=state,
+            navigate_url=navigate.to(),
+            select_url=select.to(),
         )
     
     # -------------------------------------------------------------------------
@@ -251,7 +262,7 @@ def init_router(
             state_setter=state_setter,
             callbacks=callbacks,
             path=path,
-            render_fn=_render_browser,
+            render_fn=_render_content,
         )
     
     # -------------------------------------------------------------------------

@@ -64,7 +64,7 @@ def main():
     )
     from cjm_fasthtml_file_browser.core.models import BrowserState, BrowserSelection
     from cjm_fasthtml_file_browser.providers.local import LocalFileSystemProvider
-    from cjm_fasthtml_file_browser.components.browser import render_file_browser
+    from cjm_fasthtml_file_browser.components.browser import render_file_browser, generate_scroll_preservation_script
     from cjm_fasthtml_file_browser.routes.handlers import init_router
 
     print("\n" + "=" * 70)
@@ -101,6 +101,7 @@ def main():
         selection_mode=SelectionMode.MULTIPLE,
         selectable_types="both",
         show_path_bar=True,
+        show_path_input=True,
         show_breadcrumbs=True,
         show_toolbar=True,
         container_id="general-browser",
@@ -363,6 +364,9 @@ def main():
                     ),
                     cls=combine_classes(h(96), border(), rounded.lg, overflow.hidden)
                 ),
+
+                # Scroll preservation for select operations
+                Script(generate_scroll_preservation_script(general_config.content_id)),
 
                 cls=combine_classes(container, max_w._5xl, m.x.auto, p(6))
             )

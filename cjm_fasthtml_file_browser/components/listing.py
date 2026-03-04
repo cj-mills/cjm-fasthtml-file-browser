@@ -161,8 +161,10 @@ def render_list_view(
     state: BrowserState,                    # Current browser state
     navigate_url: Optional[str] = None,     # URL for directory navigation
     select_url: Optional[str] = None,       # URL for file selection
-    hx_target: Optional[str] = None,        # HTMX target for swaps
+    hx_target: Optional[str] = None,        # HTMX target for navigate swaps
     listing_id: Optional[str] = None,       # HTML ID for the listing container
+    select_hx_target: Optional[str] = None, # HTMX target for select swaps (preserves scroll)
+    select_hx_swap: Optional[str] = None,   # HTMX swap mode for select (e.g. "innerHTML")
 ) -> Any:  # List view component
     """Render directory contents as a table/list view."""
     # Handle error state
@@ -205,7 +207,9 @@ def render_list_view(
             item_id=FileBrowserHtmlIds.item_id(idx),
             navigate_url=navigate_url,
             select_url=select_url,
-            hx_target=hx_target
+            hx_target=hx_target,
+            select_hx_target=select_hx_target,
+            select_hx_swap=select_hx_swap,
         ))
     
     # Empty state
@@ -232,8 +236,10 @@ def render_grid_view(
     state: BrowserState,                    # Current browser state
     navigate_url: Optional[str] = None,     # URL for directory navigation
     select_url: Optional[str] = None,       # URL for file selection
-    hx_target: Optional[str] = None,        # HTMX target for swaps
+    hx_target: Optional[str] = None,        # HTMX target for navigate swaps
     listing_id: Optional[str] = None,       # HTML ID for the listing container
+    select_hx_target: Optional[str] = None, # HTMX target for select swaps (preserves scroll)
+    select_hx_swap: Optional[str] = None,   # HTMX swap mode for select (e.g. "innerHTML")
 ) -> Any:  # Grid view component
     """Render directory contents as a grid of cards."""
     # Handle error state
@@ -273,7 +279,9 @@ def render_grid_view(
             item_id=FileBrowserHtmlIds.item_id(idx),
             navigate_url=navigate_url,
             select_url=select_url,
-            hx_target=hx_target
+            hx_target=hx_target,
+            select_hx_target=select_hx_target,
+            select_hx_swap=select_hx_swap,
         ))
     
     # Empty state
@@ -302,8 +310,10 @@ def render_listing(
     state: BrowserState,                    # Current browser state
     navigate_url: Optional[str] = None,     # URL for directory navigation
     select_url: Optional[str] = None,       # URL for file selection
-    hx_target: Optional[str] = None,        # HTMX target for swaps
+    hx_target: Optional[str] = None,        # HTMX target for navigate swaps
     listing_id: Optional[str] = None,       # HTML ID for the listing container
+    select_hx_target: Optional[str] = None, # HTMX target for select swaps (preserves scroll)
+    select_hx_swap: Optional[str] = None,   # HTMX swap mode for select (e.g. "innerHTML")
 ) -> Any:  # Listing component (table or grid)
     """Render directory listing based on current view mode."""
     view_mode = ViewMode(state.view_mode)
@@ -311,10 +321,12 @@ def render_listing(
     if view_mode == ViewMode.LIST:
         return render_list_view(
             listing, config, state,
-            navigate_url, select_url, hx_target, listing_id
+            navigate_url, select_url, hx_target, listing_id,
+            select_hx_target, select_hx_swap,
         )
     else:
         return render_grid_view(
             listing, config, state,
-            navigate_url, select_url, hx_target, listing_id
+            navigate_url, select_url, hx_target, listing_id,
+            select_hx_target, select_hx_swap,
         )

@@ -94,10 +94,15 @@ def render_list_item(
     item_id: Optional[str] = None,            # HTML ID for the item
     navigate_url: Optional[str] = None,       # URL for directory navigation
     select_url: Optional[str] = None,         # URL for file selection
-    hx_target: Optional[str] = None,          # HTMX target for swaps
+    hx_target: Optional[str] = None,          # HTMX target for navigate swaps
+    select_hx_target: Optional[str] = None,   # HTMX target for select swaps (preserves scroll)
+    select_hx_swap: Optional[str] = None,     # HTMX swap mode for select (e.g. "innerHTML")
 ) -> Any:  # Table row component
     """Render a file/folder as a list view row."""
     can_select = config.can_select(file_info)
+    # Defaults: select uses same target/swap as navigate if not specified
+    _select_target = select_hx_target or hx_target
+    _select_swap = select_hx_swap or "outerHTML"
     
     # Row styling
     row_cls = combine_classes(
@@ -122,9 +127,9 @@ def render_list_item(
     elif can_select and select_url:
         row_attrs["hx_post"] = select_url
         row_attrs["hx_vals"] = f'{{"path": "{file_info.path}"}}'
-        if hx_target:
-            row_attrs["hx_target"] = hx_target
-        row_attrs["hx_swap"] = "outerHTML"
+        if _select_target:
+            row_attrs["hx_target"] = _select_target
+        row_attrs["hx_swap"] = _select_swap
     
     # Build cells based on configured columns
     cells = []
@@ -135,6 +140,7 @@ def render_list_item(
         checkbox_attrs = {
             "type": "checkbox",
             "checked": is_selected,
+            "autocomplete": "off",
             "cls": combine_classes(checkbox, checkbox_colors.primary, checkbox_sizes.sm),
             "onclick": "event.stopPropagation()",  # Don't trigger row click
         }
@@ -142,9 +148,9 @@ def render_list_item(
         if select_url:
             checkbox_attrs["hx_post"] = select_url
             checkbox_attrs["hx_vals"] = f'{{"path": "{file_info.path}"}}'
-            if hx_target:
-                checkbox_attrs["hx_target"] = hx_target
-            checkbox_attrs["hx_swap"] = "outerHTML"
+            if _select_target:
+                checkbox_attrs["hx_target"] = _select_target
+            checkbox_attrs["hx_swap"] = _select_swap
         
         cells.append(Td(
             Input(**checkbox_attrs),
@@ -193,10 +199,15 @@ def render_grid_item(
     item_id: Optional[str] = None,            # HTML ID for the item
     navigate_url: Optional[str] = None,       # URL for directory navigation
     select_url: Optional[str] = None,         # URL for file selection
-    hx_target: Optional[str] = None,          # HTMX target for swaps
+    hx_target: Optional[str] = None,          # HTMX target for navigate swaps
+    select_hx_target: Optional[str] = None,   # HTMX target for select swaps (preserves scroll)
+    select_hx_swap: Optional[str] = None,     # HTMX swap mode for select (e.g. "innerHTML")
 ) -> Any:  # Grid card component
     """Render a file/folder as a grid view card."""
     can_select = config.can_select(file_info)
+    # Defaults: select uses same target/swap as navigate if not specified
+    _select_target = select_hx_target or hx_target
+    _select_swap = select_hx_swap or "outerHTML"
     
     # Card styling (include "relative" for absolute positioning of selection indicator)
     card_cls = combine_classes(
@@ -225,9 +236,9 @@ def render_grid_item(
     elif can_select and select_url:
         card_attrs["hx_post"] = select_url
         card_attrs["hx_vals"] = f'{{"path": "{file_info.path}"}}'
-        if hx_target:
-            card_attrs["hx_target"] = hx_target
-        card_attrs["hx_swap"] = "outerHTML"
+        if _select_target:
+            card_attrs["hx_target"] = _select_target
+        card_attrs["hx_swap"] = _select_swap
     
     # Selection indicator
     selection_indicator = None
@@ -247,9 +258,9 @@ def render_grid_item(
         if select_url:
             indicator_attrs["hx_post"] = select_url
             indicator_attrs["hx_vals"] = f'{{"path": "{file_info.path}"}}'
-            if hx_target:
-                indicator_attrs["hx_target"] = hx_target
-            indicator_attrs["hx_swap"] = "outerHTML"
+            if _select_target:
+                indicator_attrs["hx_target"] = _select_target
+            indicator_attrs["hx_swap"] = _select_swap
         
         selection_indicator = Div(
             lucide_icon("check", size=3, cls=str(text_dui.primary_content)) if is_selected else None,
@@ -333,16 +344,20 @@ def render_item(
     item_id: Optional[str] = None,            # HTML ID for the item
     navigate_url: Optional[str] = None,       # URL for directory navigation
     select_url: Optional[str] = None,         # URL for file selection
-    hx_target: Optional[str] = None,          # HTMX target for swaps
+    hx_target: Optional[str] = None,          # HTMX target for navigate swaps
+    select_hx_target: Optional[str] = None,   # HTMX target for select swaps (preserves scroll)
+    select_hx_swap: Optional[str] = None,     # HTMX swap mode for select (e.g. "innerHTML")
 ) -> Any:  # Item component (row or card)
     """Render a file/folder item based on view mode."""
     if view_mode == ViewMode.LIST:
         return render_list_item(
             file_info, config, is_selected, item_id,
-            navigate_url, select_url, hx_target
+            navigate_url, select_url, hx_target,
+            select_hx_target, select_hx_swap
         )
     else:
         return render_grid_item(
             file_info, config, is_selected, item_id,
-            navigate_url, select_url, hx_target
+            navigate_url, select_url, hx_target,
+            select_hx_target, select_hx_swap
         )

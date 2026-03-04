@@ -46,12 +46,12 @@ graph LR
     providers_local[providers.local<br/>Local Provider]
     routes_handlers[routes.handlers<br/>Handlers]
 
-    components_browser --> components_path_bar
-    components_browser --> components_listing
-    components_browser --> core_html_ids
     components_browser --> core_config
     components_browser --> core_models
+    components_browser --> components_listing
     components_browser --> components_toolbar
+    components_browser --> components_path_bar
+    components_browser --> core_html_ids
     components_item --> core_config
     components_listing --> core_config
     components_listing --> core_models
@@ -62,13 +62,13 @@ graph LR
     components_toolbar --> core_models
     components_toolbar --> components_item
     core_protocols --> core_models
-    providers_local --> core_protocols
     providers_local --> core_models
-    routes_handlers --> core_protocols
+    providers_local --> core_protocols
     routes_handlers --> core_config
     routes_handlers --> core_models
-    routes_handlers --> components_browser
     routes_handlers --> providers_local
+    routes_handlers --> components_browser
+    routes_handlers --> core_protocols
 ```
 
 *23 cross-module dependencies detected*
@@ -90,7 +90,8 @@ Detailed documentation for each module in the project:
 ``` python
 from cjm_fasthtml_file_browser.components.browser import (
     render_file_browser,
-    render_browser_content
+    render_browser_content,
+    generate_scroll_preservation_script
 )
 ```
 
@@ -109,9 +110,15 @@ def render_file_browser(
     path_input_url: str = "",               # URL for path input (optional)
     home_path: str = "",                    # Home directory path
     hx_target: Optional[str] = None,        # Override HTMX target (default: container_id)
+    select_hx_target: Optional[str] = None, # Override select target (default: content_id)
+    select_hx_swap: Optional[str] = None,   # Override select swap (default: "outerHTML")
 ) -> Any:  # Complete file browser component
     """
     Render the complete file browser component.
+    
+    Select operations target the content wrapper (not the full container) so that
+    path bar and toolbar are preserved. Consuming apps should include a scroll
+    preservation script for the content wrapper to maintain scroll position on select.
     
     Component hierarchy:
     ```
@@ -138,8 +145,28 @@ def render_browser_content(
     navigate_url: str,                      # URL for directory navigation
     select_url: str,                        # URL for file selection
     hx_target: Optional[str] = None,        # Override HTMX target (default: container_id)
-) -> Any:  # Browser content (listing only)
-    "Render just the browser content for partial HTMX updates."
+    select_hx_target: Optional[str] = None, # Override select target (default: content_id)
+    select_hx_swap: Optional[str] = None,   # Override select swap (default: "outerHTML")
+) -> Any:  # Content wrapper with listing (for outerHTML swap on content_id)
+    """
+    Render the content wrapper with listing for select-triggered HTMX updates.
+    
+    Returns the scrollable content wrapper div (with its ID) containing the listing.
+    Used as the outerHTML replacement for the content wrapper element, preserving
+    path bar and toolbar while replacing only the scrollable listing area.
+    """
+```
+
+``` python
+def generate_scroll_preservation_script(
+    content_id: str,  # HTML ID of the scrollable content wrapper
+) -> str:  # JavaScript snippet for scroll preservation
+    """
+    Generate a JS snippet that preserves scroll position on outerHTML swaps.
+    
+    Include this script on the page (e.g., via `Script(generate_scroll_preservation_script(...))`).
+    It listens for HTMX swap events targeting the content wrapper and saves/restores scrollTop.
+    """
 ```
 
 ### Config (`config.ipynb`)
@@ -438,7 +465,9 @@ def render_list_item(
     item_id: Optional[str] = None,            # HTML ID for the item
     navigate_url: Optional[str] = None,       # URL for directory navigation
     select_url: Optional[str] = None,         # URL for file selection
-    hx_target: Optional[str] = None,          # HTMX target for swaps
+    hx_target: Optional[str] = None,          # HTMX target for navigate swaps
+    select_hx_target: Optional[str] = None,   # HTMX target for select swaps (preserves scroll)
+    select_hx_swap: Optional[str] = None,     # HTMX swap mode for select (e.g. "innerHTML")
 ) -> Any:  # Table row component
     "Render a file/folder as a list view row."
 ```
@@ -451,7 +480,9 @@ def render_grid_item(
     item_id: Optional[str] = None,            # HTML ID for the item
     navigate_url: Optional[str] = None,       # URL for directory navigation
     select_url: Optional[str] = None,         # URL for file selection
-    hx_target: Optional[str] = None,          # HTMX target for swaps
+    hx_target: Optional[str] = None,          # HTMX target for navigate swaps
+    select_hx_target: Optional[str] = None,   # HTMX target for select swaps (preserves scroll)
+    select_hx_swap: Optional[str] = None,     # HTMX swap mode for select (e.g. "innerHTML")
 ) -> Any:  # Grid card component
     "Render a file/folder as a grid view card."
 ```
@@ -475,7 +506,9 @@ def render_item(
     item_id: Optional[str] = None,            # HTML ID for the item
     navigate_url: Optional[str] = None,       # URL for directory navigation
     select_url: Optional[str] = None,         # URL for file selection
-    hx_target: Optional[str] = None,          # HTMX target for swaps
+    hx_target: Optional[str] = None,          # HTMX target for navigate swaps
+    select_hx_target: Optional[str] = None,   # HTMX target for select swaps (preserves scroll)
+    select_hx_swap: Optional[str] = None,     # HTMX swap mode for select (e.g. "innerHTML")
 ) -> Any:  # Item component (row or card)
     "Render a file/folder item based on view mode."
 ```
@@ -555,8 +588,10 @@ def render_list_view(
     state: BrowserState,                    # Current browser state
     navigate_url: Optional[str] = None,     # URL for directory navigation
     select_url: Optional[str] = None,       # URL for file selection
-    hx_target: Optional[str] = None,        # HTMX target for swaps
+    hx_target: Optional[str] = None,        # HTMX target for navigate swaps
     listing_id: Optional[str] = None,       # HTML ID for the listing container
+    select_hx_target: Optional[str] = None, # HTMX target for select swaps (preserves scroll)
+    select_hx_swap: Optional[str] = None,   # HTMX swap mode for select (e.g. "innerHTML")
 ) -> Any:  # List view component
     "Render directory contents as a table/list view."
 ```
@@ -568,8 +603,10 @@ def render_grid_view(
     state: BrowserState,                    # Current browser state
     navigate_url: Optional[str] = None,     # URL for directory navigation
     select_url: Optional[str] = None,       # URL for file selection
-    hx_target: Optional[str] = None,        # HTMX target for swaps
+    hx_target: Optional[str] = None,        # HTMX target for navigate swaps
     listing_id: Optional[str] = None,       # HTML ID for the listing container
+    select_hx_target: Optional[str] = None, # HTMX target for select swaps (preserves scroll)
+    select_hx_swap: Optional[str] = None,   # HTMX swap mode for select (e.g. "innerHTML")
 ) -> Any:  # Grid view component
     "Render directory contents as a grid of cards."
 ```
@@ -581,8 +618,10 @@ def render_listing(
     state: BrowserState,                    # Current browser state
     navigate_url: Optional[str] = None,     # URL for directory navigation
     select_url: Optional[str] = None,       # URL for file selection
-    hx_target: Optional[str] = None,        # HTMX target for swaps
+    hx_target: Optional[str] = None,        # HTMX target for navigate swaps
     listing_id: Optional[str] = None,       # HTML ID for the listing container
+    select_hx_target: Optional[str] = None, # HTMX target for select swaps (preserves scroll)
+    select_hx_swap: Optional[str] = None,   # HTMX swap mode for select (e.g. "innerHTML")
 ) -> Any:  # Listing component (table or grid)
     "Render directory listing based on current view mode."
 ```
