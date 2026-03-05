@@ -192,7 +192,7 @@ def generate_scroll_preservation_script(
     document.addEventListener('htmx:afterSwap', function(e) {{
         if (saved != null) {{
             var el = document.getElementById('{content_id}');
-            if (el) {{ requestAnimationFrame(function() {{ el.scrollTop = saved; saved = null; }}); }}
+            if (el) {{ el.scrollTop = saved; saved = null; }}
         }}
     }});
 }})();"""
