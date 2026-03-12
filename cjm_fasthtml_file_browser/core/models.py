@@ -89,7 +89,6 @@ class BrowserState:
     """Complete browser state for persistence/restore."""
     current_path: str                                          # Current directory path
     selection: BrowserSelection = field(default_factory=BrowserSelection)  # Selection state
-    view_mode: str = "list"                                    # "list" or "grid"
     sort_by: str = "name"                                      # Sort field
     sort_descending: bool = False                              # Sort direction
     filter_extensions: Optional[List[str]] = None              # Active extension filter
@@ -100,7 +99,6 @@ class BrowserState:
             "current_path": self.current_path,
             "selected_paths": self.selection.selected_paths,
             "last_selected": self.selection.last_selected,
-            "view_mode": self.view_mode,
             "sort_by": self.sort_by,
             "sort_descending": self.sort_descending,
             "filter_extensions": self.filter_extensions,
@@ -119,7 +117,6 @@ class BrowserState:
         return cls(
             current_path=data["current_path"],
             selection=selection,
-            view_mode=data.get("view_mode", "list"),
             sort_by=data.get("sort_by", "name"),
             sort_descending=data.get("sort_descending", False),
             filter_extensions=data.get("filter_extensions"),

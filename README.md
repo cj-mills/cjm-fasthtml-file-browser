@@ -12,12 +12,11 @@ pip install cjm_fasthtml_file_browser
 ## Project Structure
 
     nbs/
-    ├── components/ (5)
-    │   ├── browser.ipynb   # Main file browser component that composes all sub-components.
-    │   ├── item.ipynb      # File and folder item rendering components for the file browser.
-    │   ├── listing.ipynb   # Directory listing components for list and grid views.
+    ├── components/ (4)
+    │   ├── browser.ipynb   # Main file browser component with virtualized collection rendering.
+    │   ├── item.ipynb      # File type icons, cell render callback for virtual collection, and empty/error state components.
     │   ├── path_bar.ipynb  # Path display, breadcrumbs navigation, and optional path input for the file browser.
-    │   └── toolbar.ipynb   # View mode toggle, sort controls, and filter controls for the file browser.
+    │   └── utils.ipynb     # Sorting and filtering utilities for file listings.
     ├── core/ (4)
     │   ├── config.ipynb     # Configuration dataclasses and enums for the file browser.
     │   ├── html_ids.ipynb   # HTML ID constants for HTMX targeting in the file browser.
@@ -26,9 +25,9 @@ pip install cjm_fasthtml_file_browser
     ├── providers/ (1)
     │   └── local.ipynb  # Local file system provider for interactive directory navigation.
     └── routes/ (1)
-        └── handlers.ipynb  # Route handlers and router initialization for the file browser.
+        └── handlers.ipynb  # Route handlers, router initialization, and virtual collection wiring for the file browser.
 
-Total: 11 notebooks across 5 directories
+Total: 10 notebooks across 5 directories
 
 ## Module Dependencies
 
@@ -36,9 +35,8 @@ Total: 11 notebooks across 5 directories
 graph LR
     components_browser[components.browser<br/>Browser]
     components_item[components.item<br/>Item]
-    components_listing[components.listing<br/>Listing]
     components_path_bar[components.path_bar<br/>Path Bar]
-    components_toolbar[components.toolbar<br/>Toolbar]
+    components_utils[components.utils<br/>Utils]
     core_config[core.config<br/>Config]
     core_html_ids[core.html_ids<br/>HTML IDs]
     core_models[core.models<br/>Models]
@@ -46,32 +44,29 @@ graph LR
     providers_local[providers.local<br/>Local Provider]
     routes_handlers[routes.handlers<br/>Handlers]
 
-    components_browser --> core_html_ids
     components_browser --> core_models
-    components_browser --> components_toolbar
     components_browser --> core_config
+    components_browser --> components_item
     components_browser --> components_path_bar
-    components_browser --> components_listing
+    components_browser --> core_html_ids
     components_item --> core_config
-    components_listing --> core_models
-    components_listing --> components_item
-    components_listing --> core_config
-    components_path_bar --> components_item
+    components_item --> core_models
     components_path_bar --> core_config
-    components_toolbar --> core_models
-    components_toolbar --> components_item
-    components_toolbar --> core_config
+    components_path_bar --> components_item
+    components_utils --> core_config
     core_protocols --> core_models
     providers_local --> core_models
     providers_local --> core_protocols
-    routes_handlers --> providers_local
     routes_handlers --> core_config
     routes_handlers --> components_browser
+    routes_handlers --> components_utils
+    routes_handlers --> providers_local
     routes_handlers --> core_protocols
     routes_handlers --> core_models
+    routes_handlers --> components_item
 ```
 
-*23 cross-module dependencies detected*
+*20 cross-module dependencies detected*
 
 ## CLI Reference
 
@@ -83,90 +78,37 @@ Detailed documentation for each module in the project:
 
 ### Browser (`browser.ipynb`)
 
-> Main file browser component that composes all sub-components.
+> Main file browser component with virtualized collection rendering.
 
 #### Import
 
 ``` python
 from cjm_fasthtml_file_browser.components.browser import (
-    render_file_browser,
-    render_browser_content,
-    generate_scroll_preservation_script
+    render_file_browser
 )
 ```
 
 #### Functions
 
-```` python
+``` python
 def render_file_browser(
-    listing: DirectoryListing,              # Current directory listing
-    config: FileBrowserConfig,              # Browser configuration
-    state: BrowserState,                    # Current browser state
-    navigate_url: str,                      # URL for directory navigation
-    select_url: str,                        # URL for file selection
-    toggle_view_url: str,                   # URL for view mode toggle
-    change_sort_url: str,                   # URL for sort change
-    refresh_url: str,                       # URL for refresh
-    path_input_url: str = "",               # URL for path input (optional)
-    home_path: str = "",                    # Home directory path
-    hx_target: Optional[str] = None,        # Override HTMX target (default: container_id)
-    select_hx_target: Optional[str] = None, # Override select target (default: content_id)
-    select_hx_swap: Optional[str] = None,   # Override select swap (default: "outerHTML")
+    items: list,                                # Current filtered/sorted FileInfo list
+    config: FileBrowserConfig,                  # Browser configuration
+    state: BrowserState,                        # Browser state (path, selection)
+    listing: DirectoryListing,                  # Raw directory listing (for path bar)
+    vc_config: VirtualCollectionConfig,         # Virtual collection config
+    vc_state: VirtualCollectionState,           # Virtual collection state
+    vc_ids: VirtualCollectionHtmlIds,           # Virtual collection HTML IDs
+    vc_btn_ids: VirtualCollectionButtonIds,     # Virtual collection button IDs
+    urls: VirtualCollectionUrls,                # Virtual collection URL bundle
+    render_cell: Callable,                      # Cell render callback
+    navigate_url: str,                          # URL for directory navigation
+    refresh_url: str,                           # URL for refresh
+    path_input_url: str = "",                   # URL for path input (optional)
+    home_path: str = "",                        # Home directory path
+    hx_target: Optional[str] = None,            # Override HTMX target (default: container_id)
 ) -> Any:  # Complete file browser component
-    """
-    Render the complete file browser component.
-    
-    Select operations target the content wrapper (not the full container) so that
-    path bar and toolbar are preserved. Consuming apps should include a scroll
-    preservation script for the content wrapper to maintain scroll position on select.
-    
-    Component hierarchy:
-    ```
-    render_file_browser(listing, config, state, ...)
-    ├── render_path_bar(...)        [if config.show_path_bar]
-    │   ├── nav_buttons()
-    │   └── breadcrumbs() OR path_input()
-    ├── render_toolbar(...)         [if config.show_toolbar]
-    │   ├── view_mode_toggle()
-    │   └── sort_controls()
-    └── render_listing(...)
-        ├── parent_navigation()
-        └── items[]
-            └── render_item() [file or folder]
-    ```
-    """
-````
-
-``` python
-def render_browser_content(
-    listing: DirectoryListing,              # Current directory listing
-    config: FileBrowserConfig,              # Browser configuration
-    state: BrowserState,                    # Current browser state
-    navigate_url: str,                      # URL for directory navigation
-    select_url: str,                        # URL for file selection
-    hx_target: Optional[str] = None,        # Override HTMX target (default: container_id)
-    select_hx_target: Optional[str] = None, # Override select target (default: content_id)
-    select_hx_swap: Optional[str] = None,   # Override select swap (default: "outerHTML")
-) -> Any:  # Content wrapper with listing (for outerHTML swap on content_id)
-    """
-    Render the content wrapper with listing for select-triggered HTMX updates.
-    
-    Returns the scrollable content wrapper div (with its ID) containing the listing.
-    Used as the outerHTML replacement for the content wrapper element, preserving
-    path bar and toolbar while replacing only the scrollable listing area.
-    """
-```
-
-``` python
-def generate_scroll_preservation_script(
-    content_id: str,  # HTML ID of the scrollable content wrapper
-) -> str:  # JavaScript snippet for scroll preservation
-    """
-    Generate a JS snippet that preserves scroll position on outerHTML swaps.
-    
-    Include this script on the page (e.g., via `Script(generate_scroll_preservation_script(...))`).
-    It listens for HTMX swap events targeting the content wrapper and saves/restores scrollTop.
-    """
+    "Render the complete file browser with virtualized collection."
 ```
 
 ### Config (`config.ipynb`)
@@ -178,7 +120,6 @@ def generate_scroll_preservation_script(
 ``` python
 from cjm_fasthtml_file_browser.core.config import (
     SelectionMode,
-    ViewMode,
     FileColumn,
     ViewConfig,
     FilterConfig,
@@ -195,11 +136,6 @@ class SelectionMode(str, Enum):
 ```
 
 ``` python
-class ViewMode(str, Enum):
-    "Display modes for directory listing."
-```
-
-``` python
 class FileColumn(str, Enum):
     "Available columns for list view."
 ```
@@ -209,11 +145,7 @@ class FileColumn(str, Enum):
 class ViewConfig:
     "View display configuration."
     
-    default_mode: ViewMode = ViewMode.LIST  # Default view mode
-    allow_mode_toggle: bool = True  # Allow user to toggle view mode
     columns: List[FileColumn] = field(...)
-    grid_columns: int = 4  # Number of columns in grid
-    show_thumbnails: bool = False  # Show image thumbnails in grid
     default_sort: FileColumn = FileColumn.NAME  # Default sort column
     sort_folders_first: bool = True  # Sort folders before files
     allow_sort_toggle: bool = True  # Allow user to change sort
@@ -265,15 +197,13 @@ class FileBrowserConfig:
     show_path_bar: bool = True
     show_path_input: bool = False  # Direct path entry field
     show_breadcrumbs: bool = True
-    show_parent_navigation: bool = True
-    show_toolbar: bool = True  # Show view/sort controls
     bookmarks: Optional[List[Tuple[str, str]]]  # [(label, path), ...]
     show_bookmarks: bool = False
     container_id: str = 'file-browser'
     content_id: str = 'file-browser-content'
     path_bar_id: str = 'file-browser-path'
     listing_id: str = 'file-browser-listing'
-    keyboard_config: Optional[Any]
+    vc_prefix: str = ''  # Prefix for virtual collection IDs (auto-generated if empty)
     
     def can_select(
             self,
@@ -284,12 +214,14 @@ class FileBrowserConfig:
 
 ### Handlers (`handlers.ipynb`)
 
-> Route handlers and router initialization for the file browser.
+> Route handlers, router initialization, and virtual collection wiring
+> for the file browser.
 
 #### Import
 
 ``` python
 from cjm_fasthtml_file_browser.routes.handlers import (
+    FileBrowserRouters,
     init_router
 )
 ```
@@ -334,27 +266,6 @@ def _handle_select(
 ```
 
 ``` python
-def _handle_toggle_view(
-    state_getter: Callable[[], BrowserState],  # Function to get current state
-    state_setter: Callable[[BrowserState], None],  # Function to save state
-    view_mode: str,                         # New view mode ("list" or "grid")
-    render_fn: Callable[[BrowserState], Any],  # Function to render browser
-) -> Any:  # Rendered browser component
-    "Handle view mode toggle."
-```
-
-``` python
-def _handle_change_sort(
-    state_getter: Callable[[], BrowserState],  # Function to get current state
-    state_setter: Callable[[BrowserState], None],  # Function to save state
-    sort_by: str,                           # Column to sort by
-    sort_descending: str,                   # Whether to sort descending ("true"/"false")
-    render_fn: Callable[[BrowserState], Any],  # Function to render browser
-) -> Any:  # Rendered browser component
-    "Handle sort change."
-```
-
-``` python
 def _handle_refresh(
     state_getter: Callable[[], BrowserState],  # Function to get current state
     render_fn: Callable[[BrowserState], Any],  # Function to render browser
@@ -362,42 +273,48 @@ def _handle_refresh(
     "Handle refresh (re-render with current state)."
 ```
 
-```` python
+``` python
+def _build_columns(
+    config: FileBrowserConfig,  # Browser config
+) -> Tuple[ColumnDef, ...]:  # Column definitions for virtual collection
+    "Build ColumnDef tuple from browser config, conditionally including checkbox column."
+```
+
+``` python
+def _rebuild_items(
+    provider: FileSystemProvider,  # File system provider
+    state: BrowserState,           # Browser state with current_path
+    config: FileBrowserConfig,     # Browser config (for filter/sort)
+) -> List[FileInfo]:  # Filtered and sorted item list
+    "List, filter, and sort directory contents."
+```
+
+``` python
 def init_router(
     config: FileBrowserConfig,                              # Browser configuration
     provider: FileSystemProvider,                           # File system provider
     state_getter: Callable[[], BrowserState],               # Function to get current state
     state_setter: Callable[[BrowserState], None],           # Function to save state
-    route_prefix: str = "/browser",                         # Route prefix for all browser routes
+    route_prefix: str = "/browser",                         # Route prefix for browser routes
+    vc_route_prefix: str = "",                              # Route prefix for VC routes (auto: {route_prefix}/vc)
     callbacks: Optional[FileBrowserCallbacks] = None,       # Optional callbacks
     home_path: Optional[str] = None,                        # Home directory (defaults to provider)
-) -> APIRouter:  # Configured APIRouter with all file browser routes
-    """
-    Initialize and return an APIRouter with all file browser routes.
+) -> FileBrowserRouters:  # Browser + collection routers and URL bundle
+    "Initialize file browser and virtual collection routers."
+```
+
+#### Classes
+
+``` python
+@dataclass
+class FileBrowserRouters:
+    "Return value from init_router — both routers, URL bundle, and render function."
     
-    Route paths are automatically derived from function names:
-    - navigate -> {prefix}/navigate
-    - select -> {prefix}/select
-    - toggle_view -> {prefix}/toggle_view
-    - change_sort -> {prefix}/change_sort
-    - refresh -> {prefix}/refresh
-    - path_input -> {prefix}/path_input
-    
-    Example:
-    ```python
-    from cjm_fasthtml_app_core.core.routing import register_routes
-    
-    router = init_router(
-        config=config,
-        provider=provider,
-        state_getter=get_state,
-        state_setter=set_state,
-        route_prefix="/browser",
-    )
-    register_routes(app, router)
-    ```
-    """
-````
+    browser: APIRouter  # File-specific routes (navigate, select, refresh, path_input)
+    collection: APIRouter  # Virtual collection routes (nav, focus, activate, sort, viewport)
+    urls: VirtualCollectionUrls  # URL bundle for rendering
+    render: Callable  # () -> Any, renders the full file browser component
+```
 
 ### HTML IDs (`html_ids.ipynb`)
 
@@ -432,7 +349,8 @@ class FileBrowserHtmlIds:
 
 ### Item (`item.ipynb`)
 
-> File and folder item rendering components for the file browser.
+> File type icons, cell render callback for virtual collection, and
+> empty/error state components.
 
 #### Import
 
@@ -440,10 +358,9 @@ class FileBrowserHtmlIds:
 from cjm_fasthtml_file_browser.components.item import (
     FILE_TYPE_ICONS,
     BROWSER_ICONS,
-    render_list_item,
-    render_grid_item,
-    render_parent_item,
-    render_item
+    create_file_cell_renderer,
+    render_empty_state,
+    render_error_state
 )
 ```
 
@@ -458,112 +375,24 @@ def _get_file_icon(
 ```
 
 ``` python
-def render_list_item(
-    file_info: FileInfo,                      # File to render
-    config: FileBrowserConfig,                # Browser configuration
-    is_selected: bool = False,                # Whether item is selected
-    item_id: Optional[str] = None,            # HTML ID for the item
-    navigate_url: Optional[str] = None,       # URL for directory navigation
-    select_url: Optional[str] = None,         # URL for file selection
-    hx_target: Optional[str] = None,          # HTMX target for navigate swaps
-    select_hx_target: Optional[str] = None,   # HTMX target for select swaps (preserves scroll)
-    select_hx_swap: Optional[str] = None,     # HTMX swap mode for select (e.g. "innerHTML")
-) -> Any:  # Table row component
-    "Render a file/folder as a list view row."
-```
-
-``` python
-def render_grid_item(
-    file_info: FileInfo,                      # File to render
-    config: FileBrowserConfig,                # Browser configuration
-    is_selected: bool = False,                # Whether item is selected
-    item_id: Optional[str] = None,            # HTML ID for the item
-    navigate_url: Optional[str] = None,       # URL for directory navigation
-    select_url: Optional[str] = None,         # URL for file selection
-    hx_target: Optional[str] = None,          # HTMX target for navigate swaps
-    select_hx_target: Optional[str] = None,   # HTMX target for select swaps (preserves scroll)
-    select_hx_swap: Optional[str] = None,     # HTMX swap mode for select (e.g. "innerHTML")
-) -> Any:  # Grid card component
-    "Render a file/folder as a grid view card."
-```
-
-``` python
-def render_parent_item(
-    parent_path: str,                         # Parent directory path
-    view_mode: ViewMode,                      # Current view mode
-    navigate_url: str,                        # URL for navigation
-    hx_target: Optional[str] = None,          # HTMX target
-) -> Any:  # Parent navigation component
-    "Render the parent directory navigation item."
-```
-
-``` python
-def render_item(
-    file_info: FileInfo,                      # File to render
-    config: FileBrowserConfig,                # Browser configuration
-    view_mode: ViewMode,                      # Current view mode
-    is_selected: bool = False,                # Whether item is selected
-    item_id: Optional[str] = None,            # HTML ID for the item
-    navigate_url: Optional[str] = None,       # URL for directory navigation
-    select_url: Optional[str] = None,         # URL for file selection
-    hx_target: Optional[str] = None,          # HTMX target for navigate swaps
-    select_hx_target: Optional[str] = None,   # HTMX target for select swaps (preserves scroll)
-    select_hx_swap: Optional[str] = None,     # HTMX swap mode for select (e.g. "innerHTML")
-) -> Any:  # Item component (row or card)
-    "Render a file/folder item based on view mode."
-```
-
-#### Variables
-
-``` python
-FILE_TYPE_ICONS: Dict[FileType, str]
-BROWSER_ICONS: Dict[str, str]
-```
-
-### Listing (`listing.ipynb`)
-
-> Directory listing components for list and grid views.
-
-#### Import
-
-``` python
-from cjm_fasthtml_file_browser.components.listing import (
-    sort_files,
-    filter_files,
-    render_empty_state,
-    render_error_state,
-    render_list_view,
-    render_grid_view,
-    render_listing
-)
-```
-
-#### Functions
-
-``` python
-def sort_files(
-    files: List[FileInfo],           # Files to sort
-    sort_by: str = "name",           # Sort field
-    descending: bool = False,        # Sort direction
-    folders_first: bool = True       # Sort folders before files
-) -> List[FileInfo]:  # Sorted file list
-    "Sort files by the specified field."
-```
-
-``` python
-def filter_files(
-    files: List[FileInfo],           # Files to filter
-    filter_config: FilterConfig      # Filter configuration
-) -> List[FileInfo]:  # Filtered file list
-    "Filter files based on configuration."
+def create_file_cell_renderer(
+    config: FileBrowserConfig,  # Browser config (for selection state access)
+    get_selection: Callable,    # () -> BrowserSelection, returns current selection
+    select_url: str = "",       # URL for checkbox click selection route
+) -> Callable:  # render_cell(item: FileInfo, ctx: CellRenderContext) -> Any
+    """
+    Create a render_cell callback for the virtual collection.
+    
+    Returns a closure that renders cell content based on column key.
+    """
 ```
 
 ``` python
 def render_empty_state(
     message: str = "No files found",  # Message to display
-    icon_name: str = "folder-open"    # Icon to show
+    icon_name: str = "folder-open"    # Lucide icon name
 ) -> Any:  # Empty state component
-    "Render empty state for when directory has no items."
+    "Render empty state for when a directory has no matching items."
 ```
 
 ``` python
@@ -573,57 +402,11 @@ def render_error_state(
     "Render error state for when directory access fails."
 ```
 
-``` python
-def _render_list_header(
-    config: FileBrowserConfig,             # Browser configuration
-    has_selectable_files: bool = False     # Whether any files can be selected
-) -> Any:  # Table header component
-    "Render the header row for list view."
-```
+#### Variables
 
 ``` python
-def render_list_view(
-    listing: DirectoryListing,              # Directory listing to render
-    config: FileBrowserConfig,              # Browser configuration
-    state: BrowserState,                    # Current browser state
-    navigate_url: Optional[str] = None,     # URL for directory navigation
-    select_url: Optional[str] = None,       # URL for file selection
-    hx_target: Optional[str] = None,        # HTMX target for navigate swaps
-    listing_id: Optional[str] = None,       # HTML ID for the listing container
-    select_hx_target: Optional[str] = None, # HTMX target for select swaps (preserves scroll)
-    select_hx_swap: Optional[str] = None,   # HTMX swap mode for select (e.g. "innerHTML")
-) -> Any:  # List view component
-    "Render directory contents as a table/list view."
-```
-
-``` python
-def render_grid_view(
-    listing: DirectoryListing,              # Directory listing to render
-    config: FileBrowserConfig,              # Browser configuration
-    state: BrowserState,                    # Current browser state
-    navigate_url: Optional[str] = None,     # URL for directory navigation
-    select_url: Optional[str] = None,       # URL for file selection
-    hx_target: Optional[str] = None,        # HTMX target for navigate swaps
-    listing_id: Optional[str] = None,       # HTML ID for the listing container
-    select_hx_target: Optional[str] = None, # HTMX target for select swaps (preserves scroll)
-    select_hx_swap: Optional[str] = None,   # HTMX swap mode for select (e.g. "innerHTML")
-) -> Any:  # Grid view component
-    "Render directory contents as a grid of cards."
-```
-
-``` python
-def render_listing(
-    listing: DirectoryListing,              # Directory listing to render
-    config: FileBrowserConfig,              # Browser configuration
-    state: BrowserState,                    # Current browser state
-    navigate_url: Optional[str] = None,     # URL for directory navigation
-    select_url: Optional[str] = None,       # URL for file selection
-    hx_target: Optional[str] = None,        # HTMX target for navigate swaps
-    listing_id: Optional[str] = None,       # HTML ID for the listing container
-    select_hx_target: Optional[str] = None, # HTMX target for select swaps (preserves scroll)
-    select_hx_swap: Optional[str] = None,   # HTMX swap mode for select (e.g. "innerHTML")
-) -> Any:  # Listing component (table or grid)
-    "Render directory listing based on current view mode."
+FILE_TYPE_ICONS: Dict[FileType, str]
+BROWSER_ICONS: Dict[str, str]
 ```
 
 ### Local Provider (`local.ipynb`)
@@ -827,7 +610,6 @@ class BrowserState:
     
     current_path: str  # Current directory path
     selection: BrowserSelection = field(...)  # Selection state
-    view_mode: str = 'list'  # "list" or "grid"
     sort_by: str = 'name'  # Sort field
     sort_descending: bool = False  # Sort direction
     filter_extensions: Optional[List[str]]  # Active extension filter
@@ -1019,51 +801,35 @@ class FileSystemProvider(Protocol):
         "Check if path is a directory."
 ```
 
-### Toolbar (`toolbar.ipynb`)
+### Utils (`utils.ipynb`)
 
-> View mode toggle, sort controls, and filter controls for the file
-> browser.
+> Sorting and filtering utilities for file listings.
 
 #### Import
 
 ``` python
-from cjm_fasthtml_file_browser.components.toolbar import (
-    render_view_toggle,
-    render_sort_controls,
-    render_toolbar
+from cjm_fasthtml_file_browser.components.utils import (
+    sort_files,
+    filter_files
 )
 ```
 
 #### Functions
 
 ``` python
-def render_view_toggle(
-    current_mode: ViewMode,                 # Current view mode
-    toggle_url: str,                        # URL for toggling view mode
-    hx_target: Optional[str] = None,        # HTMX target for swaps
-) -> Any:  # View toggle component
-    "Render view mode toggle buttons (list/grid)."
+def sort_files(
+    files: List[FileInfo],           # Files to sort
+    sort_by: str = "name",           # Sort field
+    descending: bool = False,        # Sort direction
+    folders_first: bool = True       # Sort folders before files
+) -> List[FileInfo]:  # Sorted file list
+    "Sort files by the specified field."
 ```
 
 ``` python
-def render_sort_controls(
-    current_sort: str,                      # Current sort field
-    descending: bool,                       # Current sort direction
-    config: FileBrowserConfig,              # Browser configuration
-    sort_url: str,                          # URL for changing sort
-    hx_target: Optional[str] = None,        # HTMX target for swaps
-) -> Any:  # Sort controls component
-    "Render sort dropdown and direction toggle."
-```
-
-``` python
-def render_toolbar(
-    state: BrowserState,                    # Current browser state
-    config: FileBrowserConfig,              # Browser configuration
-    toggle_url: str,                        # URL for view toggle
-    sort_url: str,                          # URL for sort changes
-    hx_target: Optional[str] = None,        # HTMX target for swaps
-    toolbar_id: Optional[str] = None,       # HTML ID for toolbar
-) -> Any:  # Toolbar component
-    "Render the complete toolbar."
+def filter_files(
+    files: List[FileInfo],           # Files to filter
+    filter_config: FilterConfig      # Filter configuration
+) -> List[FileInfo]:  # Filtered file list
+    "Filter files based on configuration."
 ```

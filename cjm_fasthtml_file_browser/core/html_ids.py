@@ -22,15 +22,8 @@ class FileBrowserHtmlIds:
     PATH_INPUT: str = "file-browser-path-input"
     BREADCRUMBS: str = "file-browser-breadcrumbs"
     
-    # Toolbar
-    TOOLBAR: str = "file-browser-toolbar"
-    VIEW_TOGGLE: str = "file-browser-view-toggle"
-    SORT_SELECT: str = "file-browser-sort-select"
-    
     # Directory listing
     LISTING: str = "file-browser-listing"
-    LISTING_LIST: str = "file-browser-listing-list"
-    LISTING_GRID: str = "file-browser-listing-grid"
     
     # Individual items
     ITEM_PREFIX: str = "file-browser-item-"
@@ -38,8 +31,6 @@ class FileBrowserHtmlIds:
     # Hidden inputs for HTMX
     CURRENT_PATH_INPUT: str = "file-browser-current-path"
     SELECTED_PATHS_INPUT: str = "file-browser-selected-paths"
-    VIEW_MODE_INPUT: str = "file-browser-view-mode"
-    SORT_BY_INPUT: str = "file-browser-sort-by"
     
     # Action buttons
     BTN_PARENT: str = "file-browser-btn-parent"
