@@ -45,25 +45,25 @@ graph LR
     routes_handlers[routes.handlers<br/>Handlers]
 
     components_browser --> core_models
-    components_browser --> core_config
-    components_browser --> components_item
     components_browser --> components_path_bar
     components_browser --> core_html_ids
-    components_item --> core_config
+    components_browser --> components_item
+    components_browser --> core_config
     components_item --> core_models
-    components_path_bar --> core_config
+    components_item --> core_config
     components_path_bar --> components_item
+    components_path_bar --> core_config
     components_utils --> core_config
     core_protocols --> core_models
     providers_local --> core_models
     providers_local --> core_protocols
-    routes_handlers --> core_config
-    routes_handlers --> components_browser
     routes_handlers --> components_utils
     routes_handlers --> providers_local
     routes_handlers --> core_protocols
+    routes_handlers --> core_config
     routes_handlers --> core_models
     routes_handlers --> components_item
+    routes_handlers --> components_browser
 ```
 
 *20 cross-module dependencies detected*

@@ -153,5 +153,6 @@ def render_file_browser(
             border(), border_dui.base_300, border_radius.box,
             bg_dui.base_100,
             overflow.hidden
-        )
+        ),
+        hx_push_url="false"
     )

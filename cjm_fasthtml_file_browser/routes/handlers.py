@@ -6,12 +6,10 @@
 __all__ = ['FileBrowserRouters', 'init_router']
 
 # %% ../../nbs/routes/handlers.ipynb #c3d4e5f6
-import json
 from dataclasses import dataclass
 from typing import Any, Callable, List, Optional, Tuple
 
 from fasthtml.common import APIRouter
-from starlette.responses import Response
 
 from cjm_fasthtml_virtual_collection.core.models import (
     VirtualCollectionConfig, VirtualCollectionState, ColumnDef, VirtualCollectionUrls,
@@ -231,9 +229,6 @@ def init_router(
         """Delegating render_cell that reads from mutable _renderer_ref."""
         return _renderer_ref[0](item, ctx)
 
-    # Forward ref for navigate URL (set after route registration)
-    _navigate_url_ref: list = [""]
-
     # --- Callbacks for virtual collection ---
     def _on_activate(item: FileInfo, row_index: int, st: VirtualCollectionState) -> Any:
         """Handle Enter/Space on focused row."""
@@ -246,12 +241,12 @@ def init_router(
     def _on_refocus(item: FileInfo, row_index: int, st: VirtualCollectionState) -> Any:
         """Handle click on already-focused row.
 
-        For directories, uses HX-Location to redirect to the navigate route
-        since row clicks use hx_swap='none' which discards HTML responses.
-        For files, returns OOB checkbox updates (work with swap='none').
+        For directories, navigates and returns the full browser as an OOB swap.
+        Row clicks use hx_swap='none' but OOB swaps are always processed.
+        For files, returns OOB checkbox updates (also work with swap='none').
         """
         if item.is_directory:
-            # Update state and redirect via HX-Location
+            # Navigate, rebuild items, render as OOB outerHTML swap
             normalized = provider.normalize_path(item.path)
             browser_state = state_getter()
             browser_state.current_path = normalized
@@ -259,12 +254,9 @@ def init_router(
             if callbacks and callbacks.on_navigate:
                 callbacks.on_navigate(normalized)
             _sync_items()
-            loc = json.dumps({
-                "path": f"{_navigate_url_ref[0]}?path={item.path}",
-                "target": f"#{config.container_id}",
-                "swap": "outerHTML",
-            })
-            return Response("", headers={"HX-Location": loc})
+            browser_html = _render_browser_full()
+            browser_html.attrs["hx-swap-oob"] = "outerHTML"
+            return (browser_html,)
         elif config.can_select(item):
             return _do_toggle_select(item, row_index)
         return ()
@@ -319,7 +311,7 @@ def init_router(
         )
 
     def _do_toggle_select(item: FileInfo, row_index: int) -> Any:
-        """Toggle selection and return OOB checkbox update."""
+        """Toggle selection and return OOB checkbox update + callback OOB elements."""
         browser_state = state_getter()
         if config.selection_mode == SelectionMode.SINGLE:
             if browser_state.selection.is_selected(item.path):
@@ -334,13 +326,18 @@ def init_router(
 
         if callbacks and callbacks.on_select:
             callbacks.on_select(item.path)
+
+        # Collect extra OOB elements from on_selection_change callback
+        extra_oob = ()
         if callbacks and callbacks.on_selection_change:
-            callbacks.on_selection_change(browser_state.selection.selected_paths)
+            result = callbacks.on_selection_change(browser_state.selection.selected_paths)
+            if result and isinstance(result, tuple):
+                extra_oob = result
 
         select_col = columns[0] if columns and columns[0].key == "select" else None
         if select_col:
-            return (render_cell_oob(item, select_col, row_index, vc_state.total_items, vc_ids, render_cell),)
-        return ()
+            return (render_cell_oob(item, select_col, row_index, vc_state.total_items, vc_ids, render_cell),) + extra_oob
+        return extra_oob
 
     @browser_router
     def navigate(path: str) -> Any:
@@ -377,9 +374,6 @@ def init_router(
         get_selection=lambda: state_getter().selection,
         select_url=select.to(),
     )
-
-    # Patch: set navigate URL forward ref for _on_refocus HX-Location
-    _navigate_url_ref[0] = navigate.to()
 
     return FileBrowserRouters(
         browser=browser_router, collection=vc_router,
