@@ -33,6 +33,7 @@ from cjm_fasthtml_lucide_icons.factory import lucide_icon
 
 # Local imports
 from ..core.config import FileBrowserConfig
+from ..core.html_ids import FileBrowserHtmlIds
 from .item import BROWSER_ICONS
 
 # %% ../../nbs/components/path_bar.ipynb #e5f6a7b8
@@ -160,10 +161,12 @@ def render_nav_buttons(
     hx_target: Optional[str] = None,        # HTMX target for swaps
 ) -> Any:  # Navigation buttons component
     """Render quick navigation buttons."""
+    ids = FileBrowserHtmlIds()
     buttons = []
     
     # Parent button
     parent_attrs = {
+        "id": ids.BTN_PARENT,
         "cls": combine_classes(btn, btn_styles.ghost, btn_sizes.sm),
         "title": "Go to parent directory",
     }
@@ -184,6 +187,7 @@ def render_nav_buttons(
     
     # Home button
     home_attrs = {
+        "id": ids.BTN_HOME,
         "hx_post": navigate_url,
         "hx_vals": f'{{"path": "{home_path}"}}',
         "hx_swap": "outerHTML",
@@ -200,6 +204,7 @@ def render_nav_buttons(
     
     # Refresh button
     refresh_attrs = {
+        "id": ids.BTN_REFRESH,
         "hx_post": refresh_url or navigate_url,
         "hx_swap": "outerHTML",
         "cls": combine_classes(btn, btn_styles.ghost, btn_sizes.sm),

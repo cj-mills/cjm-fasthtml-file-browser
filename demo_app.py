@@ -37,7 +37,7 @@ def main():
     from cjm_fasthtml_app_core.core.layout import wrap_with_layout
 
     from cjm_fasthtml_file_browser.core.config import (
-        FileBrowserConfig, FilterConfig, ViewConfig, SelectionMode, FileColumn
+        FileBrowserConfig, FileBrowserCallbacks, FilterConfig, ViewConfig, SelectionMode, FileColumn
     )
     from cjm_fasthtml_file_browser.core.models import BrowserState
     from cjm_fasthtml_file_browser.providers.local import LocalFileSystemProvider
@@ -104,16 +104,43 @@ def main():
         def setter(state): browser_states[browser_id] = state
         return setter
 
+    # --- Selection display helpers ---
+    def _render_selected_display(browser_id, label, selected_paths, oob=False):
+        """Render the 'Selected' display for a browser demo."""
+        display_id = f"{browser_id}-selected-display"
+        text = ", ".join([Path(p).name for p in selected_paths]) or "None"
+        attrs = {"id": display_id}
+        if oob:
+            attrs["hx_swap_oob"] = "true"
+        return Div(
+            Span(f"{label}: ", cls=font_weight.semibold),
+            Span(text, cls=text_dui.base_content),
+            cls=combine_classes(m.b(4), p(2), bg_dui.base_200, rounded()),
+            **attrs,
+        )
+
+    def _make_selection_callback(browser_id, label):
+        """Create an on_selection_change callback that returns OOB selected display."""
+        def on_selection_change(selected_paths):
+            return (_render_selected_display(browser_id, label, selected_paths, oob=True),)
+        return on_selection_change
+
     # Routers
     general = init_router(
         config=general_config, provider=provider,
         state_getter=get_state("general"), state_setter=set_state("general"),
         route_prefix="/browser/general", home_path=home_path,
+        callbacks=FileBrowserCallbacks(
+            on_selection_change=_make_selection_callback("general", "Selected"),
+        ),
     )
     db_picker = init_router(
         config=db_picker_config, provider=provider,
         state_getter=get_state("db_picker"), state_setter=set_state("db_picker"),
         route_prefix="/browser/db_picker", home_path=home_path,
+        callbacks=FileBrowserCallbacks(
+            on_selection_change=_make_selection_callback("db_picker", "Selected databases"),
+        ),
     )
     print("  Created 2 browser routers")
 
@@ -183,14 +210,7 @@ def main():
                       cls=combine_classes(text_dui.base_content, font_size.sm)),
                     cls=m.b(4)
                 ),
-                Div(
-                    Span("Selected: ", cls=font_weight.semibold),
-                    Span(
-                        ", ".join([Path(p).name for p in state.selection.selected_paths]) or "None",
-                        cls=text_dui.base_content
-                    ),
-                    cls=combine_classes(m.b(4), p(2), bg_dui.base_200, rounded())
-                ),
+                _render_selected_display("general", "Selected", state.selection.selected_paths),
                 Div(
                     general.render(),
                     cls=combine_classes(h(96), border(), rounded.lg, overflow.hidden)
@@ -214,14 +234,7 @@ def main():
                       cls=combine_classes(text_dui.base_content, font_size.sm)),
                     cls=m.b(4)
                 ),
-                Div(
-                    Span("Selected databases: ", cls=font_weight.semibold),
-                    Span(
-                        ", ".join([Path(p).name for p in state.selection.selected_paths]) or "None",
-                        cls=text_dui.base_content
-                    ),
-                    cls=combine_classes(m.b(4), p(2), bg_dui.base_200, rounded())
-                ),
+                _render_selected_display("db_picker", "Selected databases", state.selection.selected_paths),
                 Div(
                     db_picker.render(),
                     cls=combine_classes(h(96), border(), rounded.lg, overflow.hidden)

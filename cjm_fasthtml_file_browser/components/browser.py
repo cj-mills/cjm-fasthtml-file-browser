@@ -37,6 +37,7 @@ from cjm_fasthtml_virtual_collection.js.touch import generate_touch_nav_js
 from cjm_fasthtml_virtual_collection.js.scrollbar import generate_scrollbar_js
 from cjm_fasthtml_virtual_collection.js.auto_fit import generate_auto_fit_js, auto_fit_callback_name
 
+from cjm_fasthtml_keyboard_navigation.core.actions import KeyAction
 from cjm_fasthtml_keyboard_navigation.core.manager import ZoneManager
 from cjm_fasthtml_keyboard_navigation.components.system import render_keyboard_system
 
@@ -51,6 +52,10 @@ from .path_bar import render_path_bar
 from .item import render_empty_state
 
 # %% ../../nbs/components/browser.ipynb #h8c9d0e1
+# Global JS function name for parent directory navigation via Backspace
+_FB_GO_PARENT_CALLBACK = "fbGoParentDir"
+
+
 def render_file_browser(
     items: list,                                # Current filtered/sorted FileInfo list
     config: FileBrowserConfig,                  # Browser configuration
@@ -108,17 +113,23 @@ def render_file_browser(
     # Keyboard system
     zone = create_collection_focus_zone(vc_ids)
     nav_actions = create_collection_nav_actions(zone.id, vc_btn_ids)
-    manager = ZoneManager(zones=(zone,), actions=nav_actions)
+    # Backspace → go to parent directory (clicks the path bar parent button)
+    extra_actions = (
+        KeyAction(
+            key="Backspace",
+            js_callback=_FB_GO_PARENT_CALLBACK,
+            description="Go to parent directory",
+            hint_group="Navigation",
+            show_in_hints=False,
+        ),
+    )
+    manager = ZoneManager(zones=(zone,), actions=nav_actions + extra_actions)
     url_map = build_collection_url_map(vc_btn_ids, urls)
     target_map = {btn_id: f"#{vc_ids.rows}" for btn_id in url_map}
     swap_map = {btn_id: "none" for btn_id in url_map}
 
-    # Activate button needs outerHTML swap targeting the browser container,
-    # because on_activate may return a full browser re-render (directory navigation).
-    # OOB elements from file selection still work with outerHTML swap.
-    container_selector = f"#{config.container_id}"
-    target_map[vc_btn_ids.activate] = container_selector
-    swap_map[vc_btn_ids.activate] = "outerHTML"
+    # Activate button uses swap="none" — directory navigation and file selection
+    # both return OOB elements that self-target via hx-swap-oob attributes.
 
     kb_system = render_keyboard_system(manager, url_map=url_map, target_map=target_map, swap_map=swap_map)
     apply_nav_sync(kb_system, vc_ids)
@@ -126,6 +137,15 @@ def render_file_browser(
     children.append(kb_system.script)
     children.append(kb_system.hidden_inputs)
     children.append(kb_system.action_buttons)
+
+    # Backspace callback script (clicks the path bar's parent directory button)
+    parent_btn_id = ids.BTN_PARENT
+    children.append(Script(f"""
+        window.{_FB_GO_PARENT_CALLBACK} = function() {{
+            var btn = document.getElementById('{parent_btn_id}');
+            if (btn && !btn.disabled) btn.click();
+        }};
+    """))
 
     # JS scripts
     children.append(Script(generate_scroll_nav_js(vc_ids, vc_btn_ids)))

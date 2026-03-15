@@ -230,10 +230,27 @@ def init_router(
         return _renderer_ref[0](item, ctx)
 
     # --- Callbacks for virtual collection ---
+    def _do_navigate_oob(path: str) -> Tuple:
+        """Navigate to path and return full browser as OOB self-swap."""
+        normalized = provider.normalize_path(path)
+        browser_state = state_getter()
+        browser_state.current_path = normalized
+        state_setter(browser_state)
+        if callbacks and callbacks.on_navigate:
+            callbacks.on_navigate(normalized)
+        _sync_items()
+        browser_html = _render_browser_full()
+        browser_html.attrs["hx-swap-oob"] = "outerHTML"
+        return (browser_html,)
+
     def _on_activate(item: FileInfo, row_index: int, st: VirtualCollectionState) -> Any:
-        """Handle Enter/Space on focused row."""
+        """Handle Enter/Space on focused row.
+
+        Uses OOB self-swap for both directory navigation and file selection,
+        since the activate button uses swap='none'.
+        """
         if item.is_directory:
-            return _do_navigate(item.path)
+            return _do_navigate_oob(item.path)
         elif config.can_select(item):
             return _do_toggle_select(item, row_index)
         return ()
@@ -246,17 +263,7 @@ def init_router(
         For files, returns OOB checkbox updates (also work with swap='none').
         """
         if item.is_directory:
-            # Navigate, rebuild items, render as OOB outerHTML swap
-            normalized = provider.normalize_path(item.path)
-            browser_state = state_getter()
-            browser_state.current_path = normalized
-            state_setter(browser_state)
-            if callbacks and callbacks.on_navigate:
-                callbacks.on_navigate(normalized)
-            _sync_items()
-            browser_html = _render_browser_full()
-            browser_html.attrs["hx-swap-oob"] = "outerHTML"
-            return (browser_html,)
+            return _do_navigate_oob(item.path)
         elif config.can_select(item):
             return _do_toggle_select(item, row_index)
         return ()
