@@ -6,6 +6,7 @@
 __all__ = ['FileBrowserRouters', 'init_router']
 
 # %% ../../nbs/routes/handlers.ipynb #c3d4e5f6
+import inspect
 from dataclasses import dataclass
 from typing import Any, Callable, List, Optional, Tuple
 
@@ -229,6 +230,12 @@ def init_router(
         """Delegating render_cell that reads from mutable _renderer_ref."""
         return _renderer_ref[0](item, ctx)
 
+    # --- Cache on_selection_change signature for request passing ---
+    _sel_change_accepts_request = False
+    if callbacks and callbacks.on_selection_change:
+        sig = inspect.signature(callbacks.on_selection_change)
+        _sel_change_accepts_request = 'request' in sig.parameters
+
     # --- Callbacks for virtual collection ---
     def _do_navigate_oob(path: str) -> Tuple:
         """Navigate to path and return full browser as OOB self-swap."""
@@ -243,29 +250,20 @@ def init_router(
         browser_html.attrs["hx-swap-oob"] = "outerHTML"
         return (browser_html,)
 
-    def _on_activate(item: FileInfo, row_index: int, st: VirtualCollectionState) -> Any:
-        """Handle Enter/Space on focused row.
-
-        Uses OOB self-swap for both directory navigation and file selection,
-        since the activate button uses swap='none'.
-        """
+    def _on_activate(item: FileInfo, row_index: int, st: VirtualCollectionState, request=None) -> Any:
+        """Handle Enter/Space on focused row."""
         if item.is_directory:
             return _do_navigate_oob(item.path)
         elif config.can_select(item):
-            return _do_toggle_select(item, row_index)
+            return _do_toggle_select(item, row_index, request=request)
         return ()
 
-    def _on_refocus(item: FileInfo, row_index: int, st: VirtualCollectionState) -> Any:
-        """Handle click on already-focused row.
-
-        For directories, navigates and returns the full browser as an OOB swap.
-        Row clicks use hx_swap='none' but OOB swaps are always processed.
-        For files, returns OOB checkbox updates (also work with swap='none').
-        """
+    def _on_refocus(item: FileInfo, row_index: int, st: VirtualCollectionState, request=None) -> Any:
+        """Handle click on already-focused row."""
         if item.is_directory:
             return _do_navigate_oob(item.path)
         elif config.can_select(item):
-            return _do_toggle_select(item, row_index)
+            return _do_toggle_select(item, row_index, request=request)
         return ()
 
     def _sort_callback(items_list: list, column_key: str, ascending: bool) -> None:
@@ -317,7 +315,7 @@ def init_router(
             render_fn=lambda st: (_sync_items(), _render_browser_full())[-1],
         )
 
-    def _do_toggle_select(item: FileInfo, row_index: int) -> Any:
+    def _do_toggle_select(item: FileInfo, row_index: int, request=None) -> Any:
         """Toggle selection and return OOB checkbox update + callback OOB elements."""
         browser_state = state_getter()
         if config.selection_mode == SelectionMode.SINGLE:
@@ -337,7 +335,10 @@ def init_router(
         # Collect extra OOB elements from on_selection_change callback
         extra_oob = ()
         if callbacks and callbacks.on_selection_change:
-            result = callbacks.on_selection_change(browser_state.selection.selected_paths)
+            if _sel_change_accepts_request and request is not None:
+                result = callbacks.on_selection_change(browser_state.selection.selected_paths, request=request)
+            else:
+                result = callbacks.on_selection_change(browser_state.selection.selected_paths)
             if result and isinstance(result, tuple):
                 extra_oob = result
 
@@ -368,11 +369,11 @@ def init_router(
         return _render_browser_full()
 
     @browser_router
-    def select(path: str) -> Any:
+    def select(request, path: str) -> Any:
         """Toggle file selection via checkbox click (OOB cell update)."""
         for idx, item in enumerate(_items):
             if item.path == path:
-                return _do_toggle_select(item, idx)
+                return _do_toggle_select(item, idx, request=request)
         return ()
 
     # Patch: replace inner renderer with one that has the real select URL
