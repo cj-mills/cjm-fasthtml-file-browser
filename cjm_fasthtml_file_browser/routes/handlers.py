@@ -7,7 +7,7 @@ __all__ = ['FileBrowserRouters', 'init_router']
 
 # %% ../../nbs/routes/handlers.ipynb #c3d4e5f6
 import inspect
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, List, Optional, Tuple
 
 from fasthtml.common import APIRouter
@@ -18,7 +18,7 @@ from cjm_fasthtml_virtual_collection.core.models import (
 from cjm_fasthtml_virtual_collection.core.html_ids import VirtualCollectionHtmlIds
 from cjm_fasthtml_virtual_collection.core.button_ids import VirtualCollectionButtonIds
 from cjm_fasthtml_virtual_collection.routes.router import init_virtual_collection_router
-from cjm_fasthtml_virtual_collection.components.table import render_cell_oob
+from cjm_fasthtml_virtual_collection.components.table import render_cell_oob, render_visible_cells_oob
 
 from cjm_file_discovery.core.models import FileInfo
 
@@ -32,13 +32,18 @@ from ..components.item import create_file_cell_renderer
 from ..components.utils import sort_files, filter_files
 
 # %% ../../nbs/routes/handlers.ipynb #w46bzhycj78
+def _no_selection_oobs(changed_paths: List[str]) -> Tuple:
+    """Default no-op for render_selection_oobs."""
+    return ()
+
 @dataclass
 class FileBrowserRouters:
-    """Return value from init_router — both routers, URL bundle, and render function."""
-    browser: APIRouter           # File-specific routes (navigate, select, refresh, path_input)
-    collection: APIRouter        # Virtual collection routes (nav, focus, activate, sort, viewport)
-    urls: VirtualCollectionUrls  # URL bundle for rendering
-    render: Callable             # () -> Any, renders the full file browser component
+    """Return value from init_router — both routers, URL bundle, render, and OOB helpers."""
+    browser: APIRouter                                   # File-specific routes (navigate, select, refresh, path_input)
+    collection: APIRouter                                # Virtual collection routes (nav, focus, activate, sort, viewport)
+    urls: VirtualCollectionUrls                          # URL bundle for rendering
+    render: Callable                                     # () -> Any, renders the full file browser component
+    render_selection_oobs: Callable = field(default=_no_selection_oobs)  # (changed_paths) -> Tuple, targeted checkbox OOBs
 
 # %% ../../nbs/routes/handlers.ipynb #e5f6a7b8
 def _handle_navigate(
@@ -383,7 +388,32 @@ def init_router(
         select_url=select.to(),
     )
 
+    # --- Targeted OOB helper ---
+    def _render_selection_oobs(
+        changed_paths: List[str],  # File/folder paths whose checkbox state changed
+    ) -> Tuple[Any, ...]:  # OOB cell elements for visible items only
+        """Return OOB checkbox cell updates for paths currently visible in the browser."""
+        select_col = columns[0] if columns and columns[0].key == "select" else None
+        if not select_col:
+            return ()
+
+        path_to_index = {item.path: i for i, item in enumerate(_items)}
+        affected_indices = [path_to_index[p] for p in changed_paths if p in path_to_index]
+
+        if not affected_indices:
+            return ()
+
+        return render_visible_cells_oob(
+            column=select_col,
+            item_indices=affected_indices,
+            items=_items,
+            state=vc_state,
+            ids=vc_ids,
+            render_cell=render_cell,
+        )
+
     return FileBrowserRouters(
         browser=browser_router, collection=vc_router,
         urls=urls, render=_render_browser_full,
+        render_selection_oobs=_render_selection_oobs,
     )

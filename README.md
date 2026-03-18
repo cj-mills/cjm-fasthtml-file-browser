@@ -45,10 +45,10 @@ graph LR
     routes_handlers[routes.handlers<br/>Handlers]
 
     components_browser --> core_config
-    components_browser --> components_path_bar
-    components_browser --> core_html_ids
     components_browser --> core_models
+    components_browser --> core_html_ids
     components_browser --> components_item
+    components_browser --> components_path_bar
     components_item --> core_config
     components_item --> core_models
     components_path_bar --> core_config
@@ -58,13 +58,13 @@ graph LR
     core_protocols --> core_models
     providers_local --> core_models
     providers_local --> core_protocols
-    routes_handlers --> core_config
-    routes_handlers --> components_utils
-    routes_handlers --> providers_local
     routes_handlers --> components_item
+    routes_handlers --> core_config
+    routes_handlers --> providers_local
     routes_handlers --> core_models
-    routes_handlers --> core_protocols
     routes_handlers --> components_browser
+    routes_handlers --> components_utils
+    routes_handlers --> core_protocols
 ```
 
 *21 cross-module dependencies detected*
@@ -236,6 +236,16 @@ from cjm_fasthtml_file_browser.routes.handlers import (
 #### Functions
 
 ``` python
+def _no_selection_oobs(changed_paths: List[str]) -> Tuple:
+    """Default no-op for render_selection_oobs."""
+    return ()
+
+@dataclass
+class FileBrowserRouters
+    "Default no-op for render_selection_oobs."
+```
+
+``` python
 def _handle_navigate(
     provider: FileSystemProvider,           # File system provider
     state_getter: Callable[[], BrowserState],  # Function to get current state
@@ -315,12 +325,13 @@ def init_router(
 ``` python
 @dataclass
 class FileBrowserRouters:
-    "Return value from init_router — both routers, URL bundle, and render function."
+    "Return value from init_router — both routers, URL bundle, render, and OOB helpers."
     
     browser: APIRouter  # File-specific routes (navigate, select, refresh, path_input)
     collection: APIRouter  # Virtual collection routes (nav, focus, activate, sort, viewport)
     urls: VirtualCollectionUrls  # URL bundle for rendering
     render: Callable  # () -> Any, renders the full file browser component
+    render_selection_oobs: Callable = field(...)  # (changed_paths) -> Tuple, targeted checkbox OOBs
 ```
 
 ### HTML IDs (`html_ids.ipynb`)
