@@ -36,6 +36,10 @@ def _no_selection_oobs(changed_paths: List[str]) -> Tuple:
     """Default no-op for render_selection_oobs."""
     return ()
 
+def _no_update_selection_oobs(selected_paths: List[str], changed_paths: List[str]) -> Tuple:
+    """Default no-op for update_selection_oobs."""
+    return ()
+
 @dataclass
 class FileBrowserRouters:
     """Return value from init_router — both routers, URL bundle, render, and OOB helpers."""
@@ -44,6 +48,7 @@ class FileBrowserRouters:
     urls: VirtualCollectionUrls                          # URL bundle for rendering
     render: Callable                                     # () -> Any, renders the full file browser component
     render_selection_oobs: Callable = field(default=_no_selection_oobs)  # (changed_paths) -> Tuple, targeted checkbox OOBs
+    update_selection_oobs: Callable = field(default=_no_update_selection_oobs)  # (selected_paths, changed_paths) -> Tuple, sync + OOBs
 
 # %% ../../nbs/routes/handlers.ipynb #e5f6a7b8
 def _handle_navigate(
@@ -388,7 +393,7 @@ def init_router(
         select_url=select.to(),
     )
 
-    # --- Targeted OOB helper ---
+    # --- Targeted OOB helpers ---
     def _render_selection_oobs(
         changed_paths: List[str],  # File/folder paths whose checkbox state changed
     ) -> Tuple[Any, ...]:  # OOB cell elements for visible items only
@@ -412,8 +417,19 @@ def init_router(
             render_cell=render_cell,
         )
 
+    def _update_selection_oobs(
+        selected_paths: List[str],  # New full selection state (replaces browser selection)
+        changed_paths: List[str],   # Paths whose checkbox state changed
+    ) -> Tuple[Any, ...]:  # OOB cell elements for visible changed items
+        """Sync selection state into browser and return targeted checkbox OOBs."""
+        browser_state = state_getter()
+        browser_state.selection.selected_paths = list(selected_paths)
+        state_setter(browser_state)
+        return _render_selection_oobs(changed_paths)
+
     return FileBrowserRouters(
         browser=browser_router, collection=vc_router,
         urls=urls, render=_render_browser_full,
         render_selection_oobs=_render_selection_oobs,
+        update_selection_oobs=_update_selection_oobs,
     )

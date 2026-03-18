@@ -45,9 +45,9 @@ graph LR
     routes_handlers[routes.handlers<br/>Handlers]
 
     components_browser --> core_config
-    components_browser --> core_models
-    components_browser --> core_html_ids
     components_browser --> components_item
+    components_browser --> core_html_ids
+    components_browser --> core_models
     components_browser --> components_path_bar
     components_item --> core_config
     components_item --> core_models
@@ -56,15 +56,15 @@ graph LR
     components_path_bar --> core_html_ids
     components_utils --> core_config
     core_protocols --> core_models
-    providers_local --> core_models
     providers_local --> core_protocols
-    routes_handlers --> components_item
+    providers_local --> core_models
     routes_handlers --> core_config
-    routes_handlers --> providers_local
-    routes_handlers --> core_models
     routes_handlers --> components_browser
     routes_handlers --> components_utils
     routes_handlers --> core_protocols
+    routes_handlers --> components_item
+    routes_handlers --> providers_local
+    routes_handlers --> core_models
 ```
 
 *21 cross-module dependencies detected*
@@ -240,9 +240,18 @@ def _no_selection_oobs(changed_paths: List[str]) -> Tuple:
     """Default no-op for render_selection_oobs."""
     return ()
 
+def _no_update_selection_oobs(selected_paths: List[str], changed_paths: List[str]) -> Tuple
+    "Default no-op for render_selection_oobs."
+```
+
+``` python
+def _no_update_selection_oobs(selected_paths: List[str], changed_paths: List[str]) -> Tuple:
+    """Default no-op for update_selection_oobs."""
+    return ()
+
 @dataclass
 class FileBrowserRouters
-    "Default no-op for render_selection_oobs."
+    "Default no-op for update_selection_oobs."
 ```
 
 ``` python
@@ -332,6 +341,7 @@ class FileBrowserRouters:
     urls: VirtualCollectionUrls  # URL bundle for rendering
     render: Callable  # () -> Any, renders the full file browser component
     render_selection_oobs: Callable = field(...)  # (changed_paths) -> Tuple, targeted checkbox OOBs
+    update_selection_oobs: Callable = field(...)  # (selected_paths, changed_paths) -> Tuple, sync + OOBs
 ```
 
 ### HTML IDs (`html_ids.ipynb`)
