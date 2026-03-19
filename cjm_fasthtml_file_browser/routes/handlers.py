@@ -40,6 +40,10 @@ def _no_update_selection_oobs(selected_paths: List[str], changed_paths: List[str
     """Default no-op for update_selection_oobs."""
     return ()
 
+def _no_current_path() -> str:
+    """Default no-op for current_path."""
+    return ""
+
 @dataclass
 class FileBrowserRouters:
     """Return value from init_router — both routers, URL bundle, render, and OOB helpers."""
@@ -49,6 +53,7 @@ class FileBrowserRouters:
     render: Callable                                     # () -> Any, renders the full file browser component
     render_selection_oobs: Callable = field(default=_no_selection_oobs)  # (changed_paths) -> Tuple, targeted checkbox OOBs
     update_selection_oobs: Callable = field(default=_no_update_selection_oobs)  # (selected_paths, changed_paths) -> Tuple, sync + OOBs
+    current_path: Callable = field(default=_no_current_path)  # () -> str, current browsed directory path
 
 # %% ../../nbs/routes/handlers.ipynb #e5f6a7b8
 def _handle_navigate(
@@ -152,6 +157,99 @@ def _handle_refresh(
     state = state_getter()
     return render_fn(state)
 
+# %% ../../nbs/routes/handlers.ipynb #cmp9eb6c0c
+def _handle_toggle_select(
+    item: FileInfo,                            # File item to toggle
+    row_index: int,                            # Row index in VC items list
+    config: FileBrowserConfig,                 # Browser configuration
+    state_getter: Callable[[], BrowserState],  # Function to get current state
+    state_setter: Callable[[BrowserState], None],  # Function to save state
+    callbacks: Optional[FileBrowserCallbacks],  # Optional callbacks
+    sel_change_accepts_request: bool,          # Whether on_selection_change accepts request param
+    columns: Tuple[ColumnDef, ...],            # VC column definitions
+    vc_state: VirtualCollectionState,          # VC state (for total_items, cursor)
+    vc_ids: VirtualCollectionHtmlIds,          # VC HTML IDs
+    render_cell: Callable,                     # Cell renderer callback
+    request: Any = None,                       # Optional HTMX request
+) -> Any:  # Tuple of OOB elements (checkbox cell + callback extras)
+    """Toggle file selection and return targeted OOB checkbox update."""
+    browser_state = state_getter()
+    if config.selection_mode == SelectionMode.SINGLE:
+        if browser_state.selection.is_selected(item.path):
+            browser_state.selection.clear()
+        else:
+            browser_state.selection.set_single(item.path)
+    elif config.selection_mode == SelectionMode.MULTIPLE:
+        browser_state.selection.toggle(item.path)
+        if config.max_selections and len(browser_state.selection.selected_paths) > config.max_selections:
+            browser_state.selection.selected_paths = browser_state.selection.selected_paths[-config.max_selections:]
+    state_setter(browser_state)
+
+    if callbacks and callbacks.on_select:
+        callbacks.on_select(item.path)
+
+    # Collect extra OOB elements from on_selection_change callback
+    extra_oob = ()
+    if callbacks and callbacks.on_selection_change:
+        if sel_change_accepts_request and request is not None:
+            result = callbacks.on_selection_change(browser_state.selection.selected_paths, request=request)
+        else:
+            result = callbacks.on_selection_change(browser_state.selection.selected_paths)
+        if result and isinstance(result, tuple):
+            extra_oob = result
+
+    select_col = columns[0] if columns and columns[0].key == "select" else None
+    if select_col:
+        return (render_cell_oob(item, select_col, row_index, vc_state.total_items, vc_ids, render_cell),) + extra_oob
+    return extra_oob
+
+# %% ../../nbs/routes/handlers.ipynb #y0xg9lb5vjf
+def _build_selection_oobs(
+    changed_paths: List[str],              # File/folder paths whose checkbox state changed
+    columns: Tuple[ColumnDef, ...],        # VC column definitions
+    items: List[FileInfo],                 # Current directory items
+    vc_state: VirtualCollectionState,      # VC state (for window bounds)
+    vc_ids: VirtualCollectionHtmlIds,      # VC HTML IDs
+    render_cell: Callable,                 # Cell renderer callback
+) -> Tuple[Any, ...]:  # OOB cell elements for visible items only
+    """Return OOB checkbox cell updates for changed paths visible in the browser."""
+    select_col = columns[0] if columns and columns[0].key == "select" else None
+    if not select_col:
+        return ()
+
+    path_to_index = {item.path: i for i, item in enumerate(items)}
+    affected_indices = [path_to_index[p] for p in changed_paths if p in path_to_index]
+
+    if not affected_indices:
+        return ()
+
+    return render_visible_cells_oob(
+        column=select_col,
+        item_indices=affected_indices,
+        items=items,
+        state=vc_state,
+        ids=vc_ids,
+        render_cell=render_cell,
+    )
+
+
+def _sync_and_build_selection_oobs(
+    selected_paths: List[str],             # New full selection state (replaces browser selection)
+    changed_paths: List[str],              # Paths whose checkbox state changed
+    state_getter: Callable[[], BrowserState],  # Function to get current state
+    state_setter: Callable[[BrowserState], None],  # Function to save state
+    columns: Tuple[ColumnDef, ...],        # VC column definitions
+    items: List[FileInfo],                 # Current directory items
+    vc_state: VirtualCollectionState,      # VC state (for window bounds)
+    vc_ids: VirtualCollectionHtmlIds,      # VC HTML IDs
+    render_cell: Callable,                 # Cell renderer callback
+) -> Tuple[Any, ...]:  # OOB cell elements for visible changed items
+    """Sync selection state into browser and return targeted checkbox OOBs."""
+    browser_state = state_getter()
+    browser_state.selection.selected_paths = list(selected_paths)
+    state_setter(browser_state)
+    return _build_selection_oobs(changed_paths, columns, items, vc_state, vc_ids, render_cell)
+
 # %% ../../nbs/routes/handlers.ipynb #e854nxvakik
 def _build_columns(
     config: FileBrowserConfig,  # Browser config
@@ -230,7 +328,7 @@ def init_router(
 
     _sync_items()
 
-    # Cell renderer — uses mutable list so inner impl can be swapped after route registration
+    # Cell renderer — mutable ref so inner impl can be swapped after route registration
     _renderer_ref: list = [create_file_cell_renderer(
         config=config,
         get_selection=lambda: state_getter().selection,
@@ -246,7 +344,15 @@ def init_router(
         sig = inspect.signature(callbacks.on_selection_change)
         _sel_change_accepts_request = 'request' in sig.parameters
 
-    # --- Callbacks for virtual collection ---
+    # --- VC callbacks (thin wrappers calling extracted handlers) ---
+    def _do_toggle_select(item, row_index, request=None):
+        """Delegate to extracted _handle_toggle_select."""
+        return _handle_toggle_select(
+            item, row_index, config, state_getter, state_setter,
+            callbacks, _sel_change_accepts_request,
+            columns, vc_state, vc_ids, render_cell, request,
+        )
+
     def _do_navigate_oob(path: str) -> Tuple:
         """Navigate to path and return full browser as OOB self-swap."""
         normalized = provider.normalize_path(path)
@@ -260,7 +366,7 @@ def init_router(
         browser_html.attrs["hx-swap-oob"] = "outerHTML"
         return (browser_html,)
 
-    def _on_activate(item: FileInfo, row_index: int, st: VirtualCollectionState, request=None) -> Any:
+    def _on_activate(item, row_index, st, request=None):
         """Handle Enter/Space on focused row."""
         if item.is_directory:
             return _do_navigate_oob(item.path)
@@ -268,7 +374,7 @@ def init_router(
             return _do_toggle_select(item, row_index, request=request)
         return ()
 
-    def _on_refocus(item: FileInfo, row_index: int, st: VirtualCollectionState, request=None) -> Any:
+    def _on_refocus(item, row_index, st, request=None):
         """Handle click on already-focused row."""
         if item.is_directory:
             return _do_navigate_oob(item.path)
@@ -276,17 +382,16 @@ def init_router(
             return _do_toggle_select(item, row_index, request=request)
         return ()
 
-    def _sort_callback(items_list: list, column_key: str, ascending: bool) -> None:
+    def _sort_callback(items_list, column_key, ascending):
         """Sort items in place and update browser state."""
         browser_state = state_getter()
         browser_state.sort_by = column_key
         browser_state.sort_descending = not ascending
         state_setter(browser_state)
-        sorted_items = sort_files(
+        items_list[:] = sort_files(
             items_list, sort_by=column_key, descending=not ascending,
             folders_first=config.view.sort_folders_first,
         )
-        items_list[:] = sorted_items
 
     # --- Virtual collection router ---
     vc_router, urls = init_virtual_collection_router(
@@ -304,7 +409,7 @@ def init_router(
     # --- Browser router ---
     browser_router = APIRouter(prefix=route_prefix)
 
-    def _render_browser_full() -> Any:
+    def _render_browser_full():
         """Render complete file browser."""
         browser_state = state_getter()
         listing = provider.list_directory(browser_state.current_path)
@@ -317,45 +422,13 @@ def init_router(
             home_path=home,
         )
 
-    def _do_navigate(path: str) -> Any:
+    def _do_navigate(path):
         """Navigate to path, rebuild items, re-render."""
         return _handle_navigate(
             provider=provider, state_getter=state_getter, state_setter=state_setter,
             callbacks=callbacks, path=path,
             render_fn=lambda st: (_sync_items(), _render_browser_full())[-1],
         )
-
-    def _do_toggle_select(item: FileInfo, row_index: int, request=None) -> Any:
-        """Toggle selection and return OOB checkbox update + callback OOB elements."""
-        browser_state = state_getter()
-        if config.selection_mode == SelectionMode.SINGLE:
-            if browser_state.selection.is_selected(item.path):
-                browser_state.selection.clear()
-            else:
-                browser_state.selection.set_single(item.path)
-        elif config.selection_mode == SelectionMode.MULTIPLE:
-            browser_state.selection.toggle(item.path)
-            if config.max_selections and len(browser_state.selection.selected_paths) > config.max_selections:
-                browser_state.selection.selected_paths = browser_state.selection.selected_paths[-config.max_selections:]
-        state_setter(browser_state)
-
-        if callbacks and callbacks.on_select:
-            callbacks.on_select(item.path)
-
-        # Collect extra OOB elements from on_selection_change callback
-        extra_oob = ()
-        if callbacks and callbacks.on_selection_change:
-            if _sel_change_accepts_request and request is not None:
-                result = callbacks.on_selection_change(browser_state.selection.selected_paths, request=request)
-            else:
-                result = callbacks.on_selection_change(browser_state.selection.selected_paths)
-            if result and isinstance(result, tuple):
-                extra_oob = result
-
-        select_col = columns[0] if columns and columns[0].key == "select" else None
-        if select_col:
-            return (render_cell_oob(item, select_col, row_index, vc_state.total_items, vc_ids, render_cell),) + extra_oob
-        return extra_oob
 
     @browser_router
     def navigate(path: str) -> Any:
@@ -393,43 +466,23 @@ def init_router(
         select_url=select.to(),
     )
 
-    # --- Targeted OOB helpers ---
-    def _render_selection_oobs(
-        changed_paths: List[str],  # File/folder paths whose checkbox state changed
-    ) -> Tuple[Any, ...]:  # OOB cell elements for visible items only
-        """Return OOB checkbox cell updates for paths currently visible in the browser."""
-        select_col = columns[0] if columns and columns[0].key == "select" else None
-        if not select_col:
-            return ()
+    # --- Public helpers (thin wrappers calling extracted functions) ---
+    def _render_selection_oobs(changed_paths):
+        return _build_selection_oobs(changed_paths, columns, _items, vc_state, vc_ids, render_cell)
 
-        path_to_index = {item.path: i for i, item in enumerate(_items)}
-        affected_indices = [path_to_index[p] for p in changed_paths if p in path_to_index]
-
-        if not affected_indices:
-            return ()
-
-        return render_visible_cells_oob(
-            column=select_col,
-            item_indices=affected_indices,
-            items=_items,
-            state=vc_state,
-            ids=vc_ids,
-            render_cell=render_cell,
+    def _update_selection_oobs(selected_paths, changed_paths):
+        return _sync_and_build_selection_oobs(
+            selected_paths, changed_paths, state_getter, state_setter,
+            columns, _items, vc_state, vc_ids, render_cell,
         )
 
-    def _update_selection_oobs(
-        selected_paths: List[str],  # New full selection state (replaces browser selection)
-        changed_paths: List[str],   # Paths whose checkbox state changed
-    ) -> Tuple[Any, ...]:  # OOB cell elements for visible changed items
-        """Sync selection state into browser and return targeted checkbox OOBs."""
-        browser_state = state_getter()
-        browser_state.selection.selected_paths = list(selected_paths)
-        state_setter(browser_state)
-        return _render_selection_oobs(changed_paths)
+    def _get_current_path():
+        return state_getter().current_path
 
     return FileBrowserRouters(
         browser=browser_router, collection=vc_router,
         urls=urls, render=_render_browser_full,
         render_selection_oobs=_render_selection_oobs,
         update_selection_oobs=_update_selection_oobs,
+        current_path=_get_current_path,
     )

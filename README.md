@@ -44,16 +44,16 @@ graph LR
     providers_local[providers.local<br/>Local Provider]
     routes_handlers[routes.handlers<br/>Handlers]
 
-    components_browser --> core_config
-    components_browser --> components_item
-    components_browser --> core_html_ids
     components_browser --> core_models
     components_browser --> components_path_bar
+    components_browser --> core_html_ids
+    components_browser --> core_config
+    components_browser --> components_item
     components_item --> core_config
     components_item --> core_models
-    components_path_bar --> core_config
     components_path_bar --> components_item
     components_path_bar --> core_html_ids
+    components_path_bar --> core_config
     components_utils --> core_config
     core_protocols --> core_models
     providers_local --> core_protocols
@@ -61,9 +61,9 @@ graph LR
     routes_handlers --> core_config
     routes_handlers --> components_browser
     routes_handlers --> components_utils
-    routes_handlers --> core_protocols
     routes_handlers --> components_item
     routes_handlers --> providers_local
+    routes_handlers --> core_protocols
     routes_handlers --> core_models
 ```
 
@@ -249,9 +249,18 @@ def _no_update_selection_oobs(selected_paths: List[str], changed_paths: List[str
     """Default no-op for update_selection_oobs."""
     return ()
 
+def _no_current_path() -> str
+    "Default no-op for update_selection_oobs."
+```
+
+``` python
+def _no_current_path() -> str:
+    """Default no-op for current_path."""
+    return ""
+
 @dataclass
 class FileBrowserRouters
-    "Default no-op for update_selection_oobs."
+    "Default no-op for current_path."
 ```
 
 ``` python
@@ -300,6 +309,51 @@ def _handle_refresh(
 ```
 
 ``` python
+def _handle_toggle_select(
+    item: FileInfo,                            # File item to toggle
+    row_index: int,                            # Row index in VC items list
+    config: FileBrowserConfig,                 # Browser configuration
+    state_getter: Callable[[], BrowserState],  # Function to get current state
+    state_setter: Callable[[BrowserState], None],  # Function to save state
+    callbacks: Optional[FileBrowserCallbacks],  # Optional callbacks
+    sel_change_accepts_request: bool,          # Whether on_selection_change accepts request param
+    columns: Tuple[ColumnDef, ...],            # VC column definitions
+    vc_state: VirtualCollectionState,          # VC state (for total_items, cursor)
+    vc_ids: VirtualCollectionHtmlIds,          # VC HTML IDs
+    render_cell: Callable,                     # Cell renderer callback
+    request: Any = None,                       # Optional HTMX request
+) -> Any:  # Tuple of OOB elements (checkbox cell + callback extras)
+    "Toggle file selection and return targeted OOB checkbox update."
+```
+
+``` python
+def _build_selection_oobs(
+    changed_paths: List[str],              # File/folder paths whose checkbox state changed
+    columns: Tuple[ColumnDef, ...],        # VC column definitions
+    items: List[FileInfo],                 # Current directory items
+    vc_state: VirtualCollectionState,      # VC state (for window bounds)
+    vc_ids: VirtualCollectionHtmlIds,      # VC HTML IDs
+    render_cell: Callable,                 # Cell renderer callback
+) -> Tuple[Any, ...]:  # OOB cell elements for visible items only
+    "Return OOB checkbox cell updates for changed paths visible in the browser."
+```
+
+``` python
+def _sync_and_build_selection_oobs(
+    selected_paths: List[str],             # New full selection state (replaces browser selection)
+    changed_paths: List[str],              # Paths whose checkbox state changed
+    state_getter: Callable[[], BrowserState],  # Function to get current state
+    state_setter: Callable[[BrowserState], None],  # Function to save state
+    columns: Tuple[ColumnDef, ...],        # VC column definitions
+    items: List[FileInfo],                 # Current directory items
+    vc_state: VirtualCollectionState,      # VC state (for window bounds)
+    vc_ids: VirtualCollectionHtmlIds,      # VC HTML IDs
+    render_cell: Callable,                 # Cell renderer callback
+) -> Tuple[Any, ...]:  # OOB cell elements for visible changed items
+    "Sync selection state into browser and return targeted checkbox OOBs."
+```
+
+``` python
 def _build_columns(
     config: FileBrowserConfig,  # Browser config
 ) -> Tuple[ColumnDef, ...]:  # Column definitions for virtual collection
@@ -342,6 +396,7 @@ class FileBrowserRouters:
     render: Callable  # () -> Any, renders the full file browser component
     render_selection_oobs: Callable = field(...)  # (changed_paths) -> Tuple, targeted checkbox OOBs
     update_selection_oobs: Callable = field(...)  # (selected_paths, changed_paths) -> Tuple, sync + OOBs
+    current_path: Callable = field(...)  # () -> str, current browsed directory path
 ```
 
 ### HTML IDs (`html_ids.ipynb`)
