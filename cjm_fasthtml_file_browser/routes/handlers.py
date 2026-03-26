@@ -44,6 +44,10 @@ def _no_current_path() -> str:
     """Default no-op for current_path."""
     return ""
 
+def _no_sync_items() -> None:
+    """Default no-op for sync_items."""
+    pass
+
 @dataclass
 class FileBrowserRouters:
     """Return value from init_router — both routers, URL bundle, render, and OOB helpers."""
@@ -54,6 +58,7 @@ class FileBrowserRouters:
     render_selection_oobs: Callable = field(default=_no_selection_oobs)  # (changed_paths) -> Tuple, targeted checkbox OOBs
     update_selection_oobs: Callable = field(default=_no_update_selection_oobs)  # (selected_paths, changed_paths) -> Tuple, sync + OOBs
     current_path: Callable = field(default=_no_current_path)  # () -> str, current browsed directory path
+    sync_items: Callable = field(default=_no_sync_items)  # () -> None, rebuild items from current browser state
 
 # %% ../../nbs/routes/handlers.ipynb #e5f6a7b8
 def _handle_navigate(
@@ -499,4 +504,5 @@ def init_router(
         render_selection_oobs=_render_selection_oobs,
         update_selection_oobs=_update_selection_oobs,
         current_path=_get_current_path,
+        sync_items=_sync_items,
     )

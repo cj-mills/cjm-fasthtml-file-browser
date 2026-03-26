@@ -44,27 +44,27 @@ graph LR
     providers_local[providers.local<br/>Local Provider]
     routes_handlers[routes.handlers<br/>Handlers]
 
-    components_browser --> core_config
-    components_browser --> components_item
-    components_browser --> components_path_bar
-    components_browser --> core_html_ids
     components_browser --> core_models
+    components_browser --> components_path_bar
+    components_browser --> components_item
+    components_browser --> core_html_ids
+    components_browser --> core_config
     components_item --> core_config
     components_item --> core_models
-    components_path_bar --> core_config
     components_path_bar --> components_item
     components_path_bar --> core_html_ids
+    components_path_bar --> core_config
     components_utils --> core_config
     core_protocols --> core_models
-    providers_local --> core_protocols
     providers_local --> core_models
+    providers_local --> core_protocols
+    routes_handlers --> components_browser
     routes_handlers --> core_config
+    routes_handlers --> providers_local
     routes_handlers --> core_protocols
     routes_handlers --> components_utils
-    routes_handlers --> providers_local
-    routes_handlers --> core_models
-    routes_handlers --> components_browser
     routes_handlers --> components_item
+    routes_handlers --> core_models
 ```
 
 *21 cross-module dependencies detected*
@@ -258,9 +258,18 @@ def _no_current_path() -> str:
     """Default no-op for current_path."""
     return ""
 
+def _no_sync_items() -> None
+    "Default no-op for current_path."
+```
+
+``` python
+def _no_sync_items() -> None:
+    """Default no-op for sync_items."""
+    pass
+
 @dataclass
 class FileBrowserRouters
-    "Default no-op for current_path."
+    "Default no-op for sync_items."
 ```
 
 ``` python
@@ -397,6 +406,7 @@ class FileBrowserRouters:
     render_selection_oobs: Callable = field(...)  # (changed_paths) -> Tuple, targeted checkbox OOBs
     update_selection_oobs: Callable = field(...)  # (selected_paths, changed_paths) -> Tuple, sync + OOBs
     current_path: Callable = field(...)  # () -> str, current browsed directory path
+    sync_items: Callable = field(...)  # () -> None, rebuild items from current browser state
 ```
 
 ### HTML IDs (`html_ids.ipynb`)
