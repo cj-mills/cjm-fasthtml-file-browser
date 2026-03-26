@@ -338,27 +338,39 @@ def init_router(
         """Delegating render_cell that reads from mutable _renderer_ref."""
         return _renderer_ref[0](item, ctx)
 
-    # --- Cache on_selection_change signature for request passing ---
+    # --- Cache callback/setter signatures for request passing ---
     _sel_change_accepts_request = False
     if callbacks and callbacks.on_selection_change:
         sig = inspect.signature(callbacks.on_selection_change)
         _sel_change_accepts_request = 'request' in sig.parameters
 
+    _setter_accepts_request = False
+    _setter_sig = inspect.signature(state_setter)
+    _setter_accepts_request = 'request' in _setter_sig.parameters
+
+    def _call_state_setter(state: BrowserState, request=None):
+        """Call state_setter, passing request if the setter accepts it."""
+        if _setter_accepts_request and request is not None:
+            state_setter(state, request=request)
+        else:
+            state_setter(state)
+
     # --- VC callbacks (thin wrappers calling extracted handlers) ---
     def _do_toggle_select(item, row_index, request=None):
         """Delegate to extracted _handle_toggle_select."""
+        setter = (lambda s: _call_state_setter(s, request)) if _setter_accepts_request else state_setter
         return _handle_toggle_select(
-            item, row_index, config, state_getter, state_setter,
+            item, row_index, config, state_getter, setter,
             callbacks, _sel_change_accepts_request,
             columns, vc_state, vc_ids, render_cell, request,
         )
 
-    def _do_navigate_oob(path: str) -> Tuple:
+    def _do_navigate_oob(path: str, request=None) -> Tuple:
         """Navigate to path and return full browser as OOB self-swap."""
         normalized = provider.normalize_path(path)
         browser_state = state_getter()
         browser_state.current_path = normalized
-        state_setter(browser_state)
+        _call_state_setter(browser_state, request)
         if callbacks and callbacks.on_navigate:
             callbacks.on_navigate(normalized)
         _sync_items()
@@ -369,7 +381,7 @@ def init_router(
     def _on_activate(item, row_index, st, request=None):
         """Handle Enter/Space on focused row."""
         if item.is_directory:
-            return _do_navigate_oob(item.path)
+            return _do_navigate_oob(item.path, request=request)
         elif config.can_select(item):
             return _do_toggle_select(item, row_index, request=request)
         return ()
@@ -377,7 +389,7 @@ def init_router(
     def _on_refocus(item, row_index, st, request=None):
         """Handle click on already-focused row."""
         if item.is_directory:
-            return _do_navigate_oob(item.path)
+            return _do_navigate_oob(item.path, request=request)
         elif config.can_select(item):
             return _do_toggle_select(item, row_index, request=request)
         return ()
@@ -387,7 +399,7 @@ def init_router(
         browser_state = state_getter()
         browser_state.sort_by = column_key
         browser_state.sort_descending = not ascending
-        state_setter(browser_state)
+        _call_state_setter(browser_state)
         items_list[:] = sort_files(
             items_list, sort_by=column_key, descending=not ascending,
             folders_first=config.view.sort_folders_first,
@@ -422,27 +434,29 @@ def init_router(
             home_path=home,
         )
 
-    def _do_navigate(path):
+    def _do_navigate(path, request=None):
         """Navigate to path, rebuild items, re-render."""
+        setter = (lambda s: _call_state_setter(s, request)) if _setter_accepts_request else state_setter
         return _handle_navigate(
-            provider=provider, state_getter=state_getter, state_setter=state_setter,
+            provider=provider, state_getter=state_getter, state_setter=setter,
             callbacks=callbacks, path=path,
             render_fn=lambda st: (_sync_items(), _render_browser_full())[-1],
         )
 
     @browser_router
-    def navigate(path: str) -> Any:
+    def navigate(request, path: str) -> Any:
         """Navigate to a new directory."""
-        return _do_navigate(path)
+        return _do_navigate(path, request=request)
 
     @browser_router
-    def path_input(path: str) -> Any:
+    def path_input(request, path: str) -> Any:
         """Handle direct path input."""
+        setter = (lambda s: _call_state_setter(s, request)) if _setter_accepts_request else state_setter
         return _handle_path_input(
-            provider=provider, state_getter=state_getter, state_setter=state_setter,
+            provider=provider, state_getter=state_getter, state_setter=setter,
             callbacks=callbacks, path=path,
             render_fn=lambda st: (_sync_items(), _render_browser_full())[-1],
-            navigate_fn=lambda p: _do_navigate(p),
+            navigate_fn=lambda p: _do_navigate(p, request=request),
         )
 
     @browser_router
