@@ -47,12 +47,15 @@ def main():
     print("Initializing cjm-fasthtml-file-browser Demo")
     print("=" * 70)
 
+    APP_ID = "fbrow"
+
     app, rt = fast_app(
         pico=False,
         hdrs=[*get_daisyui_headers(), create_theme_persistence_script()],
         title="File Browser Demo",
         htmlkw={'data-theme': 'light'},
-        secret_key="demo-secret-key"
+        session_cookie=f'session_{APP_ID}_',
+        secret_key=f'{APP_ID}-demo-secret',
     )
     router = APIRouter(prefix="")
     print("  FastHTML app created")
