@@ -26,6 +26,9 @@ from cjm_fasthtml_tailwind.core.base import combine_classes
 # Lucide icons
 from cjm_fasthtml_lucide_icons.factory import lucide_icon
 
+# Design system recipes (V11 icon-size roles)
+from cjm_fasthtml_design_system.icons import icons
+
 # Local imports
 from cjm_file_discovery.core.models import FileInfo, FileType
 from ..core.config import FileBrowserConfig, FileColumn
@@ -61,8 +64,8 @@ BROWSER_ICONS: Dict[str, str] = {
 
 # %% ../../nbs/components/item.ipynb #h8c9d0e1
 def _get_file_icon(
-    file_info: FileInfo,  # File to get icon for
-    size: int = 4         # Icon size (Tailwind scale)
+    file_info: FileInfo,                  # File to get icon for
+    size: int = icons.status_inline       # Icon size (V11 status_inline role — passive type indicator next to file name)
 ) -> Any:  # Lucide icon component
     """Get the appropriate icon for a file based on its type."""
     if file_info.is_directory:
@@ -123,13 +126,13 @@ def create_file_cell_renderer(
 
         elif key == "name":
             return Div(
-                Span(_get_file_icon(item, size=4), cls=str(m.r(2))),
+                Span(_get_file_icon(item, size=icons.status_inline), cls=str(m.r(2))),
                 Span(item.name, cls=combine_classes(truncate, grow())),
                 cls=combine_classes(flex_display, items.center, min_w._0)
             )
 
         elif key == "size":
-            text = item.size_str if not item.is_directory else "\u2014"
+            text = item.size_str if not item.is_directory else "—"
             return Span(text, cls=combine_classes(text_dui.base_content.opacity(70), font_size.sm))
 
         elif key == "modified":
@@ -154,7 +157,7 @@ def render_empty_state(
     """Render empty state for when a directory has no matching items."""
     return Div(
         Div(
-            lucide_icon(icon_name, size=12, cls=str(text_dui.base_content.opacity(30))),
+            lucide_icon(icon_name, size=icons.empty_state, cls=str(text_dui.base_content.opacity(30))),
             cls=str(m.b(4))
         ),
         P(message, cls=combine_classes(text_dui.base_content.opacity(50), font_size.lg)),
@@ -171,7 +174,7 @@ def render_error_state(
     """Render error state for when directory access fails."""
     return Div(
         Div(
-            lucide_icon("circle-alert", size=12, cls=str(text_dui.error)),
+            lucide_icon("circle-alert", size=icons.empty_state, cls=str(text_dui.error)),
             cls=str(m.b(4))
         ),
         P(error_message, cls=combine_classes(text_dui.error, font_size.lg)),

@@ -31,6 +31,9 @@ from cjm_fasthtml_tailwind.core.base import combine_classes
 # Lucide icons
 from cjm_fasthtml_lucide_icons.factory import lucide_icon
 
+# Design system recipes (V11 icon-size roles)
+from cjm_fasthtml_design_system.icons import icons
+
 # Local imports
 from ..core.config import FileBrowserConfig
 from ..core.html_ids import FileBrowserHtmlIds
@@ -181,7 +184,7 @@ def render_nav_buttons(
         parent_attrs["cls"] = combine_classes(parent_attrs["cls"], "opacity-50")
     
     buttons.append(Button(
-        lucide_icon(BROWSER_ICONS["parent"], size=4),
+        lucide_icon(BROWSER_ICONS["parent"], size=icons.icon_button),
         **parent_attrs
     ))
     
@@ -198,7 +201,7 @@ def render_nav_buttons(
         home_attrs["hx_target"] = hx_target
     
     buttons.append(Button(
-        lucide_icon(BROWSER_ICONS["home"], size=4),
+        lucide_icon(BROWSER_ICONS["home"], size=icons.icon_button),
         **home_attrs
     ))
     
@@ -214,7 +217,7 @@ def render_nav_buttons(
         refresh_attrs["hx_target"] = hx_target
     
     buttons.append(Button(
-        lucide_icon(BROWSER_ICONS["refresh"], size=4),
+        lucide_icon(BROWSER_ICONS["refresh"], size=icons.icon_button),
         **refresh_attrs
     ))
     
