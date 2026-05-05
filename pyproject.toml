@@ -25,6 +25,6 @@ cjm_fasthtml_file_browser = "cjm_fasthtml_file_browser._modidx:d"
 version = {attr = "cjm_fasthtml_file_browser.__version__"}
 
 [tool.setuptools.packages.find]
-include = ["cjm_fasthtml_file_browser"]
+include = ["cjm_fasthtml_file_browser*"]
 
 [tool.nbdev]
