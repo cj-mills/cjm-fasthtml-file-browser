@@ -12,7 +12,6 @@ from typing import Any, List, Optional, Tuple
 from fasthtml.common import Div, Span, Button, Ul, Li, A, Input, Form
 
 # DaisyUI components
-from cjm_fasthtml_daisyui.components.actions.button import btn, btn_colors, btn_sizes, btn_styles
 from cjm_fasthtml_daisyui.components.data_input.text_input import text_input, text_input_sizes
 from cjm_fasthtml_daisyui.components.navigation.breadcrumbs import breadcrumbs
 from cjm_fasthtml_daisyui.utilities.semantic_colors import bg_dui, text_dui, border_dui
@@ -31,7 +30,8 @@ from cjm_fasthtml_tailwind.core.base import combine_classes
 # Lucide icons
 from cjm_fasthtml_lucide_icons.factory import lucide_icon
 
-# Design system recipes (V11 icon-size roles)
+# Design system recipes (V1 button roles, V11 icon-size roles)
+from cjm_fasthtml_design_system.buttons import buttons
 from cjm_fasthtml_design_system.icons import icons
 
 # Local imports
@@ -150,7 +150,7 @@ def render_path_input(
         Button(
             "Go",
             type="submit",
-            cls=combine_classes(btn, btn_colors.primary, btn_sizes.sm)
+            cls=buttons.primary_action,
         ),
         **form_attrs
     )
@@ -165,12 +165,12 @@ def render_nav_buttons(
 ) -> Any:  # Navigation buttons component
     """Render quick navigation buttons."""
     ids = FileBrowserHtmlIds()
-    buttons = []
+    nav_buttons = []
     
     # Parent button
     parent_attrs = {
         "id": ids.BTN_PARENT,
-        "cls": combine_classes(btn, btn_styles.ghost, btn_sizes.sm),
+        "cls": buttons.soft_utility,
         "title": "Go to parent directory",
     }
     if parent_path:
@@ -183,7 +183,7 @@ def render_nav_buttons(
         parent_attrs["disabled"] = True
         parent_attrs["cls"] = combine_classes(parent_attrs["cls"], "opacity-50")
     
-    buttons.append(Button(
+    nav_buttons.append(Button(
         lucide_icon(BROWSER_ICONS["parent"], size=icons.icon_button),
         **parent_attrs
     ))
@@ -194,13 +194,13 @@ def render_nav_buttons(
         "hx_post": navigate_url,
         "hx_vals": f'{{"path": "{home_path}"}}',
         "hx_swap": "outerHTML",
-        "cls": combine_classes(btn, btn_styles.ghost, btn_sizes.sm),
+        "cls": buttons.soft_utility,
         "title": "Go to home directory",
     }
     if hx_target:
         home_attrs["hx_target"] = hx_target
     
-    buttons.append(Button(
+    nav_buttons.append(Button(
         lucide_icon(BROWSER_ICONS["home"], size=icons.icon_button),
         **home_attrs
     ))
@@ -210,19 +210,19 @@ def render_nav_buttons(
         "id": ids.BTN_REFRESH,
         "hx_post": refresh_url or navigate_url,
         "hx_swap": "outerHTML",
-        "cls": combine_classes(btn, btn_styles.ghost, btn_sizes.sm),
+        "cls": buttons.soft_utility,
         "title": "Refresh",
     }
     if hx_target:
         refresh_attrs["hx_target"] = hx_target
     
-    buttons.append(Button(
+    nav_buttons.append(Button(
         lucide_icon(BROWSER_ICONS["refresh"], size=icons.icon_button),
         **refresh_attrs
     ))
     
     return Div(
-        *buttons,
+        *nav_buttons,
         cls=combine_classes(flex_display, gap(1))
     )
 
