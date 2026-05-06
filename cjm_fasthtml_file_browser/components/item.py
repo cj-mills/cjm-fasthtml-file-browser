@@ -14,6 +14,8 @@ from fasthtml.common import Div, Span, P, Input
 from cjm_fasthtml_daisyui.components.data_input.checkbox import checkbox, checkbox_colors, checkbox_sizes
 from cjm_fasthtml_daisyui.utilities.semantic_colors import text_dui
 
+from cjm_fasthtml_design_system.text_tiers import text_tiers
+
 # Tailwind utilities
 from cjm_fasthtml_tailwind.utilities.spacing import p, m
 from cjm_fasthtml_tailwind.utilities.sizing import w, min_h, min_w
@@ -133,17 +135,17 @@ def create_file_cell_renderer(
 
         elif key == "size":
             text = item.size_str if not item.is_directory else "—"
-            return Span(text, cls=combine_classes(text_dui.base_content.opacity(70), font_size.sm))
+            return Span(text, cls=combine_classes(text_tiers.secondary, font_size.sm))
 
         elif key == "modified":
             return Span(
                 item.modified_str,
-                cls=combine_classes(text_dui.base_content.opacity(70), font_size.sm),
+                cls=combine_classes(text_tiers.secondary, font_size.sm),
             )
 
         elif key == "type":
             text = "Folder" if item.is_directory else (item.extension or "File").upper()
-            return Span(text, cls=combine_classes(text_dui.base_content.opacity(70), font_size.sm))
+            return Span(text, cls=combine_classes(text_tiers.secondary, font_size.sm))
 
         return Span("")
 
@@ -157,10 +159,10 @@ def render_empty_state(
     """Render empty state for when a directory has no matching items."""
     return Div(
         Div(
-            lucide_icon(icon_name, size=icons.empty_state, cls=str(text_dui.base_content.opacity(30))),
+            lucide_icon(icon_name, size=icons.empty_state, cls=text_tiers.subtle),
             cls=str(m.b(4))
         ),
-        P(message, cls=combine_classes(text_dui.base_content.opacity(50), font_size.lg)),
+        P(message, cls=combine_classes(text_tiers.muted, font_size.lg)),
         cls=combine_classes(
             flex_display, flex_direction.col, items.center, justify.center,
             p(8), min_h(48)

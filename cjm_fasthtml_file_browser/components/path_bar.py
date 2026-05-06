@@ -16,6 +16,8 @@ from cjm_fasthtml_daisyui.components.data_input.text_input import text_input, te
 from cjm_fasthtml_daisyui.components.navigation.breadcrumbs import breadcrumbs
 from cjm_fasthtml_daisyui.utilities.semantic_colors import bg_dui, text_dui, border_dui
 
+from cjm_fasthtml_design_system.text_tiers import text_tiers
+
 # Tailwind utilities
 from cjm_fasthtml_tailwind.utilities.spacing import p, m
 from cjm_fasthtml_tailwind.utilities.sizing import w, h, min_w
@@ -89,7 +91,7 @@ def render_breadcrumbs(
         
         # Add ellipsis after first segment if truncated
         if show_ellipsis and i == 1:
-            items_list.append(Li(Span("...", cls=str(text_dui.base_content.opacity(50)))))
+            items_list.append(Li(Span("...", cls=text_tiers.muted)))
         
         if is_last:
             # Current location - not a link
