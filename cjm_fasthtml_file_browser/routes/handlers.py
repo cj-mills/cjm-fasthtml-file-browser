@@ -10,7 +10,7 @@ import inspect
 from dataclasses import dataclass, field
 from typing import Any, Callable, List, Optional, Tuple
 
-from fasthtml.common import APIRouter
+from cjm_fasthtml_app_core.core.routing import APIRouter
 
 from cjm_fasthtml_virtual_collection.core.models import (
     VirtualCollectionConfig, VirtualCollectionState, ColumnDef, VirtualCollectionUrls,
