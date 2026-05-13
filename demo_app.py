@@ -25,7 +25,7 @@ def main():
     from cjm_fasthtml_tailwind.utilities.sizing import container, max_w, h
     from cjm_fasthtml_tailwind.utilities.typography import font_size, font_weight, text_align
     from cjm_fasthtml_tailwind.utilities.flexbox_and_grid import (
-        grid_display, grid_cols, gap
+        grid_display, grid_cols, gap, flex_display, items, justify
     )
     from cjm_fasthtml_tailwind.utilities.borders import border, rounded
     from cjm_fasthtml_tailwind.utilities.layout import overflow
@@ -42,6 +42,8 @@ def main():
     from cjm_fasthtml_file_browser.core.models import BrowserState
     from cjm_fasthtml_file_browser.providers.local import LocalFileSystemProvider
     from cjm_fasthtml_file_browser.routes.handlers import init_router
+
+    from cjm_fasthtml_keyboard_navigation.components.hints_modal import render_keyboard_hints_modal
 
     print("\n" + "=" * 70)
     print("Initializing cjm-fasthtml-file-browser Demo")
@@ -128,7 +130,10 @@ def main():
             return (_render_selected_display(browser_id, label, selected_paths, oob=True),)
         return on_selection_change
 
-    # Routers
+    # Routers — manager_label documents the new L7 plumbing. The label is
+    # consumed by render_keyboard_hints_modal only when this router's kb_manager
+    # is passed as a child_managers entry (hierarchical mode); single-manager
+    # modals don't display it but setting it is harmless.
     general = init_router(
         config=general_config, provider=provider,
         state_getter=get_state("general"), state_setter=set_state("general"),
@@ -136,6 +141,7 @@ def main():
         callbacks=FileBrowserCallbacks(
             on_selection_change=_make_selection_callback("general", "Selected"),
         ),
+        manager_label="General File Browser",
     )
     db_picker = init_router(
         config=db_picker_config, provider=provider,
@@ -144,6 +150,7 @@ def main():
         callbacks=FileBrowserCallbacks(
             on_selection_change=_make_selection_callback("db_picker", "Selected databases"),
         ),
+        manager_label="Database Picker",
     )
     print("  Created 2 browser routers")
 
@@ -205,19 +212,31 @@ def main():
     def demo_general(request):
         def browser_content():
             state = browser_states["general"]
+            # Keyboard shortcuts modal — single-manager mode, surfaces file-browser's
+            # nav actions in the modal. Distinct modal_id per demo so the `?` listener
+            # targets the right modal even though only one demo page renders at a time.
+            hints_modal, hints_trigger, hints_script = render_keyboard_hints_modal(
+                general.kb_manager,
+                modal_id="fb-general-hints-modal",
+            )
             return Div(
                 Div(
-                    H1("General File Browser",
-                       cls=combine_classes(font_size._2xl, font_weight.bold)),
-                    P("Click to focus, click again or Enter to navigate/select. Arrow keys to move.",
-                      cls=combine_classes(text_dui.base_content, font_size.sm)),
-                    cls=m.b(4)
+                    Div(
+                        H1("General File Browser",
+                           cls=combine_classes(font_size._2xl, font_weight.bold)),
+                        P("Click to focus, click again or Enter to navigate/select. Arrow keys to move.",
+                          cls=combine_classes(text_dui.base_content, font_size.sm)),
+                    ),
+                    hints_trigger,
+                    cls=combine_classes(flex_display, items.start, justify.between, m.b(4))
                 ),
                 _render_selected_display("general", "Selected", state.selection.selected_paths),
                 Div(
                     general.render(),
                     cls=combine_classes(h(96), border(), rounded.lg, overflow.hidden)
                 ),
+                hints_modal,
+                hints_script,
                 cls=combine_classes(container, max_w._5xl, m.x.auto, p(6))
             )
         return handle_htmx_request(
@@ -229,19 +248,28 @@ def main():
     def demo_db_picker(request):
         def browser_content():
             state = browser_states["db_picker"]
+            hints_modal, hints_trigger, hints_script = render_keyboard_hints_modal(
+                db_picker.kb_manager,
+                modal_id="fb-db-picker-hints-modal",
+            )
             return Div(
                 Div(
-                    H1("Database File Picker",
-                       cls=combine_classes(font_size._2xl, font_weight.bold)),
-                    P("Only .db, .sqlite, and .sqlite3 files shown. Multi-select enabled.",
-                      cls=combine_classes(text_dui.base_content, font_size.sm)),
-                    cls=m.b(4)
+                    Div(
+                        H1("Database File Picker",
+                           cls=combine_classes(font_size._2xl, font_weight.bold)),
+                        P("Only .db, .sqlite, and .sqlite3 files shown. Multi-select enabled.",
+                          cls=combine_classes(text_dui.base_content, font_size.sm)),
+                    ),
+                    hints_trigger,
+                    cls=combine_classes(flex_display, items.start, justify.between, m.b(4))
                 ),
                 _render_selected_display("db_picker", "Selected databases", state.selection.selected_paths),
                 Div(
                     db_picker.render(),
                     cls=combine_classes(h(96), border(), rounded.lg, overflow.hidden)
                 ),
+                hints_modal,
+                hints_script,
                 cls=combine_classes(container, max_w._5xl, m.x.auto, p(6))
             )
         return handle_htmx_request(

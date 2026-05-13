@@ -44,26 +44,26 @@ graph LR
     providers_local[providers.local<br/>Local Provider]
     routes_handlers[routes.handlers<br/>Handlers]
 
-    components_browser --> core_models
     components_browser --> components_path_bar
-    components_browser --> components_item
-    components_browser --> core_html_ids
     components_browser --> core_config
+    components_browser --> core_models
+    components_browser --> core_html_ids
+    components_browser --> components_item
     components_item --> core_config
     components_item --> core_models
+    components_path_bar --> core_config
     components_path_bar --> components_item
     components_path_bar --> core_html_ids
-    components_path_bar --> core_config
     components_utils --> core_config
     core_protocols --> core_models
-    providers_local --> core_models
     providers_local --> core_protocols
-    routes_handlers --> components_browser
+    providers_local --> core_models
     routes_handlers --> core_config
-    routes_handlers --> providers_local
-    routes_handlers --> core_protocols
     routes_handlers --> components_utils
+    routes_handlers --> core_protocols
     routes_handlers --> components_item
+    routes_handlers --> providers_local
+    routes_handlers --> components_browser
     routes_handlers --> core_models
 ```
 
@@ -85,11 +85,37 @@ Detailed documentation for each module in the project:
 
 ``` python
 from cjm_fasthtml_file_browser.components.browser import (
+    FB_GO_PARENT_CALLBACK,
+    build_file_browser_keyboard_system,
     render_file_browser
 )
 ```
 
 #### Functions
+
+``` python
+def build_file_browser_keyboard_system(
+    vc_ids: VirtualCollectionHtmlIds,           # Virtual collection HTML IDs
+    vc_btn_ids: VirtualCollectionButtonIds,     # Virtual collection button IDs
+    urls: VirtualCollectionUrls,                # Virtual collection URL bundle
+    manager_label: Optional[str] = None,        # Human-readable label for the ZoneManager (used as the modal section header when rendered as a child)
+) -> KeyboardSystem:                            # Complete rendered KeyboardSystem (carries .manager for hierarchical hints handoff)
+    """
+    Build the file browser's KeyboardSystem standalone.
+    
+    Lifts the manager construction out of `render_file_browser` so the
+    underlying `ZoneManager` is accessible via `KeyboardSystem.manager` —
+    consumers wiring this system as a child in a hierarchy pass that manager
+    to `render_keyboard_hints_modal(..., child_managers=[...])` so the modal's
+    section header reads as `manager_label` instead of the technical system_id.
+    
+    The composition (VC nav actions + Backspace→parent-dir extra action +
+    `apply_nav_sync` on the action buttons) matches what `render_file_browser`
+    used to build internally pre-L7. Callers who want the default behavior
+    don't need to call this directly — `render_file_browser` builds the
+    system internally when its `keyboard_system` parameter is None.
+    """
+```
 
 ``` python
 def render_file_browser(
@@ -108,14 +134,25 @@ def render_file_browser(
     path_input_url: str = "",                   # URL for path input (optional)
     home_path: str = "",                        # Home directory path
     hx_target: Optional[str] = None,            # Override HTMX target (default: container_id)
+    keyboard_system: Optional[KeyboardSystem] = None,  # Pre-built keyboard system (when None, builds internally via build_file_browser_keyboard_system)
+    manager_label: Optional[str] = None,        # Label for the internally-built ZoneManager (ignored when keyboard_system is provided)
 ) -> Any:  # Complete file browser component
-    "Render the complete file browser with virtualized collection."
+    """
+    Render the complete file browser with virtualized collection.
+    
+    When `keyboard_system` is provided, the caller has built the system
+    upstream (typically `init_router`) and owns the underlying `ZoneManager`.
+    When None, builds the system internally via `build_file_browser_keyboard_system`
+    using `manager_label`. The internally-built path preserves pre-L7 behavior
+    for direct `render_file_browser` callers that don't need the manager handoff.
+    """
 ```
 
 #### Variables
 
 ``` python
-_FB_GO_PARENT_CALLBACK = 'fbGoParentDir'
+FB_GO_PARENT_CALLBACK = 'fbGoParentDir'
+_FB_GO_PARENT_CALLBACK
 ```
 
 ### Config (`config.ipynb`)
@@ -380,15 +417,6 @@ def _rebuild_items(
 
 ``` python
 def init_router(
-    config: FileBrowserConfig,                              # Browser configuration
-    provider: FileSystemProvider,                           # File system provider
-    state_getter: Callable[[], BrowserState],               # Function to get current state
-    state_setter: Callable[[BrowserState], None],           # Function to save state
-    route_prefix: str = "/browser",                         # Route prefix for browser routes
-    vc_route_prefix: str = "",                              # Route prefix for VC routes (auto: {route_prefix}/vc)
-    callbacks: Optional[FileBrowserCallbacks] = None,       # Optional callbacks
-    home_path: Optional[str] = None,                        # Home directory (defaults to provider)
-) -> FileBrowserRouters:  # Browser + collection routers and URL bundle
     "Initialize file browser and virtual collection routers."
 ```
 
@@ -407,6 +435,7 @@ class FileBrowserRouters:
     update_selection_oobs: Callable = field(...)  # (selected_paths, changed_paths) -> Tuple, sync + OOBs
     current_path: Callable = field(...)  # () -> str, current browsed directory path
     sync_items: Callable = field(...)  # () -> None, rebuild items from current browser state
+    kb_manager: Optional[ZoneManager]  # ZoneManager backing the file browser's keyboard system — hand to render_keyboard_hints_modal(..., child_managers=[...]) for hierarchical hint display
 ```
 
 ### HTML IDs (`html_ids.ipynb`)
@@ -461,8 +490,8 @@ from cjm_fasthtml_file_browser.components.item import (
 
 ``` python
 def _get_file_icon(
-    file_info: FileInfo,  # File to get icon for
-    size: int = 4         # Icon size (Tailwind scale)
+    file_info: FileInfo,                  # File to get icon for
+    size: int = icons.status_inline       # Icon size (V11 status_inline role — passive type indicator next to file name)
 ) -> Any:  # Lucide icon component
     "Get the appropriate icon for a file based on its type."
 ```

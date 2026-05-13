@@ -20,6 +20,8 @@ from cjm_fasthtml_virtual_collection.core.button_ids import VirtualCollectionBut
 from cjm_fasthtml_virtual_collection.routes.router import init_virtual_collection_router
 from cjm_fasthtml_virtual_collection.components.table import render_cell_oob, render_visible_cells_oob
 
+from cjm_fasthtml_keyboard_navigation.core.manager import ZoneManager
+
 from cjm_file_discovery.core.models import FileInfo
 
 from cjm_fasthtml_file_browser.core.config import (
@@ -27,7 +29,9 @@ from cjm_fasthtml_file_browser.core.config import (
 )
 from ..core.models import BrowserState
 from ..core.protocols import FileSystemProvider
-from ..components.browser import render_file_browser
+from cjm_fasthtml_file_browser.components.browser import (
+    render_file_browser, build_file_browser_keyboard_system,
+)
 from ..components.item import create_file_cell_renderer
 from ..components.utils import sort_files, filter_files
 
@@ -59,6 +63,7 @@ class FileBrowserRouters:
     update_selection_oobs: Callable = field(default=_no_update_selection_oobs)  # (selected_paths, changed_paths) -> Tuple, sync + OOBs
     current_path: Callable = field(default=_no_current_path)  # () -> str, current browsed directory path
     sync_items: Callable = field(default=_no_sync_items)  # () -> None, rebuild items from current browser state
+    kb_manager: Optional[ZoneManager] = None             # ZoneManager backing the file browser's keyboard system — hand to render_keyboard_hints_modal(..., child_managers=[...]) for hierarchical hint display
 
 # %% ../../nbs/routes/handlers.ipynb #e5f6a7b8
 def _handle_navigate(
@@ -305,6 +310,7 @@ def init_router(
     vc_route_prefix: str = "",                              # Route prefix for VC routes (auto: {route_prefix}/vc)
     callbacks: Optional[FileBrowserCallbacks] = None,       # Optional callbacks
     home_path: Optional[str] = None,                        # Home directory (defaults to provider)
+    manager_label: Optional[str] = None,                    # Human-readable label for the file browser's ZoneManager (used as the modal section header when wired into a hierarchical hints display via FileBrowserRouters.kb_manager)
 ) -> FileBrowserRouters:  # Browser + collection routers and URL bundle
     """Initialize file browser and virtual collection routers."""
     home = home_path or (provider.get_home_path() if hasattr(provider, 'get_home_path') else "/")
@@ -423,6 +429,16 @@ def init_router(
         route_prefix=_vc_prefix,
     )
 
+    # --- Keyboard system (built once at init time so kb_manager can be surfaced
+    # on FileBrowserRouters for hierarchical hints handoff). The same kb_system
+    # is reused across renders — its DOM elements (script, hidden_inputs,
+    # action_buttons) are static across navigations; only the file list
+    # rebuilds. Re-using avoids constructing a fresh ZoneManager per render.
+    kb_system = build_file_browser_keyboard_system(
+        vc_ids=vc_ids, vc_btn_ids=vc_btn_ids, urls=urls,
+        manager_label=manager_label,
+    )
+
     # --- Browser router ---
     browser_router = APIRouter(prefix=route_prefix)
 
@@ -437,6 +453,7 @@ def init_router(
             navigate_url=navigate.to(), refresh_url=refresh.to(),
             path_input_url=path_input.to() if config.show_path_input else "",
             home_path=home,
+            keyboard_system=kb_system,
         )
 
     def _do_navigate(path, request=None):
@@ -505,4 +522,5 @@ def init_router(
         update_selection_oobs=_update_selection_oobs,
         current_path=_get_current_path,
         sync_items=_sync_items,
+        kb_manager=kb_system.manager,
     )
