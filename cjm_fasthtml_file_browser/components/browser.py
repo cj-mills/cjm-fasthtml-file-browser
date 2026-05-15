@@ -21,6 +21,9 @@ from cjm_fasthtml_tailwind.utilities.flexbox_and_grid import flex_display, flex_
 from cjm_fasthtml_tailwind.utilities.layout import overflow
 from cjm_fasthtml_tailwind.core.base import combine_classes
 
+# App-core: V8 empty-state rendering helper
+from cjm_fasthtml_app_core.components.empty_state import render_empty_state
+
 # Virtual collection
 from cjm_fasthtml_virtual_collection.core.models import (
     VirtualCollectionConfig, VirtualCollectionState, VirtualCollectionUrls,
@@ -49,7 +52,6 @@ from ..core.config import FileBrowserConfig
 from ..core.models import DirectoryListing, BrowserState
 from ..core.html_ids import FileBrowserHtmlIds
 from .path_bar import render_path_bar
-from .item import render_empty_state
 
 # %% ../../nbs/components/browser.ipynb #h8c9d0e1
 # Global JS function name for parent directory navigation via Backspace.
@@ -160,6 +162,9 @@ def render_file_browser(
         ))
 
     # Virtual collection (wrapped in flex column so collection fills available height)
+    # Empty state composes V8 anatomy via app-core's render_empty_state helper:
+    # icon-above-title-above-detail centered in the wrapper. The folder-open
+    # icon + "No files found" message match the prior local-helper defaults.
     children.append(Div(
         render_virtual_collection(
             items=items,
@@ -168,7 +173,10 @@ def render_file_browser(
             ids=vc_ids,
             urls=urls,
             render_cell=render_cell,
-            render_empty=render_empty_state,
+            render_empty=lambda: render_empty_state(
+                message="No files found",
+                icon_name="folder-open",
+            ),
         ),
         id=config.content_id,
         cls=combine_classes(

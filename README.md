@@ -44,30 +44,29 @@ graph LR
     providers_local[providers.local<br/>Local Provider]
     routes_handlers[routes.handlers<br/>Handlers]
 
-    components_browser --> components_path_bar
     components_browser --> core_config
-    components_browser --> core_models
     components_browser --> core_html_ids
-    components_browser --> components_item
+    components_browser --> core_models
+    components_browser --> components_path_bar
     components_item --> core_config
     components_item --> core_models
     components_path_bar --> core_config
-    components_path_bar --> components_item
     components_path_bar --> core_html_ids
+    components_path_bar --> components_item
     components_utils --> core_config
     core_protocols --> core_models
     providers_local --> core_protocols
     providers_local --> core_models
-    routes_handlers --> core_config
     routes_handlers --> components_utils
-    routes_handlers --> core_protocols
-    routes_handlers --> components_item
-    routes_handlers --> providers_local
+    routes_handlers --> core_config
     routes_handlers --> components_browser
+    routes_handlers --> providers_local
+    routes_handlers --> core_protocols
     routes_handlers --> core_models
+    routes_handlers --> components_item
 ```
 
-*21 cross-module dependencies detected*
+*20 cross-module dependencies detected*
 
 ## CLI Reference
 
@@ -481,7 +480,6 @@ from cjm_fasthtml_file_browser.components.item import (
     FILE_TYPE_ICONS,
     BROWSER_ICONS,
     create_file_cell_renderer,
-    render_empty_state,
     render_error_state
 )
 ```
@@ -507,14 +505,6 @@ def create_file_cell_renderer(
     
     Returns a closure that renders cell content based on column key.
     """
-```
-
-``` python
-def render_empty_state(
-    message: str = "No files found",  # Message to display
-    icon_name: str = "folder-open"    # Lucide icon name
-) -> Any:  # Empty state component
-    "Render empty state for when a directory has no matching items."
 ```
 
 ``` python
